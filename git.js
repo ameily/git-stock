@@ -1,13 +1,19 @@
 
 var child_process = require('child_process');
 var events = require("events");
+var _ = require('underscore');
 
 module.exports = function(attrs) {
     this.path = attrs.path;
 
 
-    this.getRevList = function(before, after, cb) {
-        
+    this.getCommitList = function(before, after, cb) {
+        var cmd = 'git log --format="%H" ' + before + '...' + after;
+        child_process.exec(cmd, function(error, stdout, stderr) {
+            var commits = _.filter(stdout.split('\n'), function(hash) { return hash.length > 0; });
+            commits.reverse();
+            cb(commits);
+        }, { cwd: this.path });
     };
 
     this.parseCommit = function(hash, cb) {
