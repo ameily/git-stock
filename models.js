@@ -9,23 +9,35 @@ function getDayTimestamp(ts) {
     return ts - (ts % 86400);
 }
 
-var StockDaySummary = mongoose.Model('StockDaySummary', {
+var valueMixin = function() {
+    return this.price * this.shares;
+};
+
+var StockDaySummarySchema = new mongoose.Schema({
     stock: {
         type: mongoose.Schema.ObjectId,
         ref: 'Stock'
     },
     price: Number,
+    shares: Number,
     timestamp: Number
 });
+StockDaySummarySchema.virtual('value').get(valueMixin);
 
-var MarketDaySummary = mongoose.Model('MarketDaySummary', {
+var StockDaySummary = mongoose.Model('StockDaySummary', StockDaySummarySchema);
+
+var MarketDaySummarySchema = new mongoose.Schema({
     stock: {
         type: mongoose.Schema.ObjectId,
         ref: 'Market'
     },
-    value: Number,
+    shares: Number,
+    price: Number,
     timestamp: Number
 });
+MarketDaySummarySchema.virtual('value').get(valueMixin);
+
+var MarketDaySummary = mongoose.Model('MarketDaySummary', MarketDaySummarySchema);
 
 
 var MarketGroup = mongoose.Model('MarketGroup', {
@@ -38,9 +50,12 @@ var MarketSchema = new mongoose.Schema({
     groups: [String],
     path: String,
     name: String,
-    value: Number,
+    shares: Number,
+    price: Number,
     symbol: String
 });
+
+MarketSchema.virtual('value').get(valueMixin);
 
 MarketSchema.methods.getSummaryForToday = function(cb) {
     var market = this;
@@ -57,17 +72,21 @@ MarketSchema.methods.getSummaryForToday = function(cb) {
     });
 };
 
-export.Market = mongoose.Model('Market', MarketSchema);
+var Market = mongoose.Model('Market', MarketSchema);
 
 
 var StockSchema = new mongoose.Schema({
     email: String,
+    name: String,
     market: {
         type: mongoose.Schema.ObjectId,
         ref: "Market"
     },
+    shares: Number,
     price: Number
 });
+
+StockSchema.virtual('value').get(valueMixin);
 
 StockSchema.methods.getSummaryForToday = function(cb) {
     var stock = this;
@@ -83,7 +102,7 @@ StockSchema.methods.getSummaryForToday = function(cb) {
         cb(this, stock);
     });
 };
-export.Stock = mongoose.Model('Stock', StockSchema);
+var Stock = mongoose.Model('Stock', StockSchema);
 
 
 var CommitSchema = new mongoose.Schema({
@@ -94,7 +113,18 @@ var CommitSchema = new mongoose.Schema({
         ref: "Market"
     }
 });
-export.Commit = mongoose.Model('Commit', CommitSchema);
+var Commit = mongoose.Model('Commit', CommitSchema);
 
 
 
+// Exports
+////////////////////////////////////////////
+
+module.exports = {
+    StockDaySummary: StockDaySummary,
+    MarketDaySummary: MarketDaySummary,
+    Stock: Stock,
+    Market: Market,
+    Commit: Commit,
+    MarketGroup: MarketGroup
+};
