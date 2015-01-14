@@ -24,7 +24,7 @@ var StockDaySummarySchema = new mongoose.Schema({
 });
 StockDaySummarySchema.virtual('value').get(valueMixin);
 
-var StockDaySummary = mongoose.Model('StockDaySummary', StockDaySummarySchema);
+var StockDaySummary = mongoose.model('StockDaySummary', StockDaySummarySchema);
 
 var MarketDaySummarySchema = new mongoose.Schema({
     stock: {
@@ -37,23 +37,16 @@ var MarketDaySummarySchema = new mongoose.Schema({
 });
 MarketDaySummarySchema.virtual('value').get(valueMixin);
 
-var MarketDaySummary = mongoose.Model('MarketDaySummary', MarketDaySummarySchema);
+var MarketDaySummary = mongoose.model('MarketDaySummary', MarketDaySummarySchema);
 
 
-var MarketGroup = mongoose.Model('MarketGroup', {
+var MarketGroup = mongoose.model('MarketGroup', {
     symbol: String,
     name: String
 });
 
 
-var MarketSchema = new mongoose.Schema({
-    groups: [String],
-    path: String,
-    name: String,
-    shares: Number,
-    price: Number,
-    symbol: String
-});
+var MarketSchema = new mongoose.Schema({ symbol: String });
 
 MarketSchema.virtual('value').get(valueMixin);
 
@@ -72,7 +65,7 @@ MarketSchema.methods.getSummaryForToday = function(cb) {
     });
 };
 
-var Market = mongoose.Model('Market', MarketSchema);
+var Market = mongoose.model('Market', MarketSchema);
 
 
 var StockSchema = new mongoose.Schema({
@@ -102,18 +95,20 @@ StockSchema.methods.getSummaryForToday = function(cb) {
         cb(this, stock);
     });
 };
-var Stock = mongoose.Model('Stock', StockSchema);
+var Stock = mongoose.model('Stock', StockSchema);
 
 
 var CommitSchema = new mongoose.Schema({
     hash: String,
     branches: [String],
-    market: {
-        type: mongoose.Schema.ObjectId,
-        ref: "Market"
-    }
+    //authorEmail: String,
+    //market: {
+    //    type: mongoose.Schema.ObjectId,
+    //    ref: "Market"
+    //}
+    market: mongoose.Schema.ObjectId
 });
-var Commit = mongoose.Model('Commit', CommitSchema);
+var Commit = mongoose.model('Commit', CommitSchema);
 
 
 
