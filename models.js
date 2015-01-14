@@ -46,7 +46,14 @@ var MarketGroup = mongoose.model('MarketGroup', {
 });
 
 
-var MarketSchema = new mongoose.Schema({ symbol: String });
+var MarketSchema = new mongoose.Schema({
+    symbol: String,
+    name: String,
+    path: String,
+    groups: [String],
+    shares: Number,
+    price: Number
+});
 
 MarketSchema.virtual('value').get(valueMixin);
 
