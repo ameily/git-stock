@@ -1,11 +1,15 @@
 
-var Stock = require('./stock');
 var EventEmitter = require('events').EventEmitter;
 var GitInterface = require('./git');
-var StockController = require('./stock');
-var Stock = require('./models').stock;
+var models = require('./models');
+var _ = require('underscore');
+var util = require('util');
+var async = require('async');
 
 
+var Commit = models.Commit,
+    Stock = models.Stock,
+    Market = models.Market;
 
 var MarketController = function(attrs) {
     EventEmitter.call(this);
@@ -23,25 +27,59 @@ var MarketController = function(attrs) {
         Stock.find({ market: this.market._id }, function(err, stocks) {
             _.each(stocks, function(stock) {
                 self.stocks.push(stock);
-                self.emit("stock", stock);
+                //self.emit("stock", stock);
             });
             if(cb) cb();
         });
     };
 
-    this.processCommit = function(hash) {
+    this.processCommit = function(hash, branch) {
         var self = this;
         this.git.getCommit(hash, function(commit) {
-            self.emit("commit", commit);
+            Commit.findOne({ market: self.market._id, hash: hash }, function(err, found) {
+                if(found && false) {
+                    if(branch && !(branch in found.branches)) {
+                        found.branches.push(branch);
+                        console.log("Add Branch: %s [%s]", branch, hash);
+                        found.save();
+                    }
+                } else {
+                    console.log("New Commit: %s", commit.hash);
+                    var entry = new Commit({
+                        hash: commit.hash,
+                        branches: branch ? [branch] : []
+                    });
+                    //entry.save();
+
+                    //self.emit("commit", commit);
+                }
+            });
         });
     };
 
-    this.processCommitRange = function(before, after) {
+    this.processCommitRange = function(before, after, branch) {
         var self = this;
 
-        this.git.getCommitList(before, after, function(commit) {
-            commit.stock = self.getStockByEmail(commit.author, true);
-            self.emit("commit", commit);
+        this.git.getCommitList(before, after, function(commits) {
+            _.each(commits, function(commit) {
+                self.processCommit(commit, branch);
+            });
+        });
+    };
+
+    this.importRepo = function(cb) {
+        var self = this;
+
+        this.git.getBranchList(function(branches) {
+            _.each(branches, function(branch) {
+                console.log("New Branch: %s [%s]", branch.name, branch.head);
+                self.git.getCommitList(branch.head, function(commits) {
+                    _.each(commits, function(commit) {
+                        self.processCommit(commit);
+                    });
+                });
+            });
+            if(cb) cb();
         });
     };
 
@@ -85,4 +123,6 @@ var MarketController = function(attrs) {
     };
 };
 
-export.MarketController = MarketController;
+util.inherits(MarketController, EventEmitter);
+
+module.exports = MarketController;
