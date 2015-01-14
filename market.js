@@ -33,44 +33,56 @@ var MarketController = function(attrs) {
         });
     };
 
-    this.processCommit = function(hash, branch) {
+    this.processCommit = function(hash, branch, cb) {
         var self = this;
         this.git.getCommit(hash, function(commit) {
             Commit.findOne({ market: self.market._id, hash: hash }, function(err, found) {
-                if(found && false) {
+                if(found) {
                     if(branch && !(branch in found.branches)) {
                         found.branches.push(branch);
                         console.log("Add Branch: %s [%s]", branch, hash);
-                        found.save();
+                        found.save(cb);
                     }
                 } else {
                     console.log("New Commit: %s", commit.hash);
                     var entry = new Commit({
                         hash: commit.hash,
-                        branches: branch ? [branch] : []
+                        branches: branch ? [branch] : [],
+                        market: self.market._id
                     });
-                    //entry.save();
+                    entry.save(cb);
 
                     //self.emit("commit", commit);
                 }
+
+                //cb();
             });
         });
     };
 
-    this.processCommitRange = function(before, after, branch) {
+    this.processCommitRange = function(before, after, branch, cb) {
         var self = this;
 
         this.git.getCommitList(before, after, function(commits) {
-            _.each(commits, function(commit) {
-                self.processCommit(commit, branch);
-            });
+            async.eachLimit(commits, 5, function(commit, commitCb) {
+                self.processCommit(commit, branch, commitCb);
+            }, cb);
         });
     };
 
-    this.importRepo = function(cb) {
+    this.importRepo = function(done) {
         var self = this;
 
         this.git.getBranchList(function(branches) {
+            async.eachLimit(branches, 5, function(branch, branchCb) {
+                console.log("New Branch: %s [%s]", branch.name, branch.head);
+                self.git.getCommitList(branch.head, function(commits) {
+                    async.eachLimit(commits, 5, function(commit, commitCb) {
+                        self.processCommit(commit, branch.name, commitCb);
+                    }, branchCb);
+                });
+            }, done);
+            /*
             _.each(branches, function(branch) {
                 console.log("New Branch: %s [%s]", branch.name, branch.head);
                 self.git.getCommitList(branch.head, function(commits) {
@@ -80,6 +92,7 @@ var MarketController = function(attrs) {
                 });
             });
             if(cb) cb();
+            */
         });
     };
 
