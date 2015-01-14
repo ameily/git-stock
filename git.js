@@ -1,6 +1,7 @@
 
 var child_process = require('child_process');
 var _ = require('underscore');
+var moment = require('moment');
 
 
 var GitInterface = function(attrs) {
@@ -8,8 +9,10 @@ var GitInterface = function(attrs) {
 
     this.getCommitList = function(before, after, cb) {
         var cmd = 'git log --format="%H" ' + before;
-        if(after) {
+        if(after && cb) {
             cmd += '...' + after;
+        } else {
+            cb = after;
         }
 
         child_process.exec(cmd, { cwd: this.path }, function(error, stdout, stderr) {
@@ -30,8 +33,15 @@ var GitInterface = function(attrs) {
                     attrs.hash = line;
                 } else if(i == 1) {
                     // parent(s)
-                    attrs.parentHashes = line.length > 0 ? line.split(' ') : [];
-                    attrs.isMerge = self.parentHashes.length > 1;
+                    //attrs.parent = line.length > 0 ? line.split(' ') : [];
+                    var parents = line.length > 0 ? line.split(' ') : [];
+                    if(parents.length > 1) {
+                        attrs.parent = parents;
+                        attrs.isMerge = true;
+                    } else {
+                        attrs.isMerge = false;
+                        attrs.parent = parents.length == 1 ? parents[0] : null;
+                    }
                 } else if(i == 2) {
                     // author (name)
                     attrs.author = { name: line, email: "" };
@@ -49,8 +59,7 @@ var GitInterface = function(attrs) {
 
             attrs.body = bodyLines.join('\n');
 
-            var commit = new Commit(attrs);
-            cb(commit);
+            cb(attrs);
         });
     };
 
@@ -70,8 +79,8 @@ var GitInterface = function(attrs) {
                 console.log('Commit: ' + hash);
 
                 branches.push({
-                    commit: hash,
-                    branch: branch
+                    head: hash,
+                    name: branch
                 });
             });
             cb(branches);
