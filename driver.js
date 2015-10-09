@@ -29,7 +29,9 @@ MarketDriver.prototype.handleSingle = function(hash, branch) {
     branch: branch
   };
 
-  this.repo.getCommit(hash).then(function(commit) {
+  console.log("Single:", hash);
+
+  return this.repo.getCommit(hash).then(function(commit) {
     obj.commit = commit;
     return commit.getDiff();
   }).then(function(diffList) {
@@ -44,7 +46,7 @@ MarketDriver.prototype.handleSingle = function(hash, branch) {
 
     return Promise.all(children);
   }).then(function() {
-    self.makePipeline(obj);
+    return self.makePipeline(obj);
   }).catch(function(error) {
     console.log("handleSingle error: ", error); // TODO
   });
@@ -53,8 +55,11 @@ MarketDriver.prototype.handleSingle = function(hash, branch) {
 
 MarketDriver.prototype.handleRange = function(begin, end, branch) {
   var self = this;
+  console.log('before create walker');
   var walker = this.repo.createRevWalk();
-  walker.pushRange(end + ".." + begin);
+  console.log("before pushRange");
+  walker.pushRange(begin + ".." + end);
+  var range = [];
 
   function revFoundCallback(oid) {
     if(!oid) {
@@ -63,30 +68,50 @@ MarketDriver.prototype.handleRange = function(begin, end, branch) {
 
     console.log("found commit: ", oid);
 
-    self.handleSingle(oid, branch);
-    return walker.next().then(revFoundCallback);
+    return self.handleSingle(oid, branch).then(function() {
+      return walker.next().then(revFoundCallback);
+    });
   }
-
-  walker.next().then(revFoundCallback).done(function() {
-    self.handleSingle(end, branch);
+  console.log("before walker.next()");
+  return walker.next().then(revFoundCallback).then(function() {
+    console.log("last commit:", begin);
+    /*
+    range.push(begin);
+    range.reverse();
+    return Promise.all(
+      _.map(range, function(hash) {
+        return self.handleSingle(hash, branch);
+      })
+    );
+    */
+    return self.handleSingle(begin, branch);
   });
 };
 
 MarketDriver.prototype.makePipeline = function(obj) {
-  var pipe = new PluginPipeline({
-    branch: obj.branch,
-    commit: obj.commit,
-    market: null,
-    config: this.config,
-    plugins: this.plugins,
-    diffList: obj.diffList
+  var self = this;
+  console.log("makePipeline()");
+
+  var promise = new Promise(function(resolve, reject) {
+    var pipe = new PluginPipeline({
+      branch: obj.branch,
+      commit: obj.commit,
+      market: null,
+      config: self.config,
+      plugins: self.plugins,
+      diffList: obj.diffList
+    });
+
+    pipe.on('end', function() {
+      console.log("Done");
+      resolve();
+    }).on('error', function(err) {
+      console.log("Error: ", err);
+      reject(err);
+    }).next();
   });
 
-  pipe.on('end', function() {
-    console.log("Done");
-  }).on('error', function(err) {
-    console.log("Error: ", err);
-  }).next();
+  return promise;
 };
 
 module.exports = MarketDriver;
