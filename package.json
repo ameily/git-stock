@@ -1,0 +1,19 @@
+{
+  "name": "git-stock",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ameily/git-stock"
+  },
+  "author": "Adam Meily",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ameily/git-stock/issues"
+  },
+  "homepage": "https://github.com/ameily/git-stock"
+}
