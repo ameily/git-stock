@@ -15,5 +15,10 @@
   "bugs": {
     "url": "https://github.com/ameily/git-stock/issues"
   },
-  "homepage": "https://github.com/ameily/git-stock"
+  "homepage": "https://github.com/ameily/git-stock",
+  "dependencies": {
+    "nodegit": "^0.5.0",
+    "promise": "^7.0.4",
+    "underscore": "^1.8.3"
+  }
 }
