@@ -1,6 +1,7 @@
 
 var util = require('util');
 var EventEmitter = require('events').EventEmitter;
+var VError = require('verror');
 
 
 function PluginPipeline(options) {
@@ -21,7 +22,6 @@ function PluginPipeline(options) {
     log: function(id, value) {
       this.journal.push({ id: id, value: value });
       pipe.delta += value;
-      console.log("%s: %d", id, value);
     }
   };
 
@@ -33,8 +33,13 @@ util.inherits(PluginPipeline, EventEmitter);
 
 
 
-PluginPipeline.prototype.next = function() {
+PluginPipeline.prototype.next = function(err) {
   var self = this;
+  if(err) {
+    var plugin = this.plugins[this.index];
+    this.emit('error', new VError(err, "error in plugin %s", plugin.name || plugin.id));
+  }
+
   this.index += 1;
 
   if(this.index >= this.plugins.length) {
@@ -50,6 +55,7 @@ PluginPipeline.prototype.next = function() {
       self.next();
     });
   } catch(err) {
+    console.log("pipe error");
     this.emit('error', err);
   }
 
