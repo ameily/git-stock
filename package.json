@@ -19,6 +19,7 @@
   "dependencies": {
     "nodegit": "^0.5.0",
     "promise": "^7.0.4",
-    "underscore": "^1.8.3"
+    "underscore": "^1.8.3",
+    "verror": "^1.6.0"
   }
 }
