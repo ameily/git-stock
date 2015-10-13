@@ -11,6 +11,8 @@ function MarketDriver(options) {
   this.config = options.config;
   this.plugins = options.plugins;
   this.repo = null;
+  this.stocks = {};
+  this.commits = 0;
 }
 
 
@@ -29,7 +31,7 @@ MarketDriver.prototype.handleSingle = function(hash, branch) {
     branch: branch
   };
 
-  console.log("Single:", hash);
+  console.log("Processing commit:", hash);
 
   return this.repo.getCommit(hash).then(function(commit) {
     obj.commit = commit;
@@ -48,16 +50,15 @@ MarketDriver.prototype.handleSingle = function(hash, branch) {
   }).then(function() {
     return self.makePipeline(obj);
   }).catch(function(error) {
-    console.log("handleSingle error: ", error); // TODO
+    //console.log("handleSingle error: ", error); // TODO
+    throw error;
   });
 };
 
 
 MarketDriver.prototype.handleRange = function(begin, end, branch) {
   var self = this;
-  console.log('before create walker');
   var walker = this.repo.createRevWalk();
-  console.log("before pushRange");
   walker.pushRange(begin + ".." + end);
   var range = [];
 
@@ -66,31 +67,18 @@ MarketDriver.prototype.handleRange = function(begin, end, branch) {
       return;
     }
 
-    console.log("found commit: ", oid);
-
     return self.handleSingle(oid, branch).then(function() {
       return walker.next().then(revFoundCallback);
     });
   }
-  console.log("before walker.next()");
+
   return walker.next().then(revFoundCallback).then(function() {
-    console.log("last commit:", begin);
-    /*
-    range.push(begin);
-    range.reverse();
-    return Promise.all(
-      _.map(range, function(hash) {
-        return self.handleSingle(hash, branch);
-      })
-    );
-    */
     return self.handleSingle(begin, branch);
   });
 };
 
 MarketDriver.prototype.makePipeline = function(obj) {
   var self = this;
-  console.log("makePipeline()");
 
   var promise = new Promise(function(resolve, reject) {
     var pipe = new PluginPipeline({
@@ -103,10 +91,16 @@ MarketDriver.prototype.makePipeline = function(obj) {
     });
 
     pipe.on('end', function() {
-      console.log("Done");
+      var email = obj.commit.author().email();
+      if(email in self.stocks) {
+        self.stocks[email] += pipe.delta;
+      } else {
+        self.stocks[email] = pipe.delta;
+      }
+      self.commits += 1;
       resolve();
     }).on('error', function(err) {
-      console.log("Error: ", err);
+      console.log("rejected:", reject);
       reject(err);
     }).next();
   });
