@@ -18,12 +18,16 @@ function PluginPipeline(options) {
     branch: options.branch,
     market: options.market,
     diffList: options.diffList,
+    stock: options.stock,
     journal: [],
     log: function(id, value) {
       this.journal.push({ id: id, value: value });
+      this.stock.log(id, value);
       pipe.delta += value;
     }
   };
+
+  this.data.stock.commits += 1;
 
   EventEmitter.call(this);
 }
@@ -37,6 +41,7 @@ PluginPipeline.prototype.next = function(err) {
   var self = this;
   if(err) {
     var plugin = this.plugins[this.index];
+    console.log("ERROR in plugin");
     this.emit('error', new VError(err, "error in plugin %s", plugin.name || plugin.id));
   }
 
@@ -56,6 +61,7 @@ PluginPipeline.prototype.next = function(err) {
     });
   } catch(err) {
     console.log("pipe error");
+    console.trace(err);
     this.emit('error', err);
   }
 
