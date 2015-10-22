@@ -34,9 +34,16 @@ function isDeltaDeletedFile(delta) {
     testFlag(delta.status(), git.Diff.DELTA.DELETED);
 }
 
+function isDeltaRenamedFile(delta) {
+  return delta.oldFile().id().iszero() == 0 &&
+    delta.newFile().id().iszero() == 0 &&
+    testFlag(delta.status(), git.Diff.DELTA.RENAMED);
+}
+
 exports.getDiffFile = getDiffFile;
 exports.isDeltaNormalFile = isDeltaNormalFile;
 exports.isDeltaBinaryFile = isDeltaBinaryFile;
 exports.isDeltaNewFile = isDeltaNewFile;
 exports.isDeltaDeletedFile = isDeltaDeletedFile;
+exports.isDeltaRenamedFile = isDeltaRenamedFile;
 exports.testFlag = testFlag;
