@@ -18,18 +18,24 @@ exports.BaseCommit = {
   }
 };
 
+
+
 exports.WellformedMessage = {
   id: "commit.message",
   name: "Commit subject reward",
   description: "Check for valid and wellformed commit subject and body",
 
   config: {
-    deltaPerLine: 2,
+    deltaPerLine: 5,
     maxLineLength: 79,
-    maxDelta: 10
+    maxDelta: 30
   },
 
   processCommit: function(commit, config, data, next) {
+    if(commit.parentcount() == 2) {
+      return next();
+    }
+
     var delta = 0;
     var lines = commit.message().replace('\r', '').split('\n');
 
@@ -73,6 +79,11 @@ exports.IssueReferences = {
   closePrefix: ['close', 'closes', 'fixes', 'fix'],
 
   processCommit: function(commit, config, data, next) {
+    if(commit.parentcount() == 2) {
+      return next();
+    }
+
+
     var re = /(closes|close|refs|ref|fixes|fix)\s+#(\d+)\b/gi;
     var message = commit.message();
     var fixes = [];
@@ -121,8 +132,14 @@ exports.NewFiles = {
   },
 
   processCommit: function(commit, config, data, next) {
+    if(commit.parentcount() == 2) {
+      return next();
+    }
+
+
     var self = this;
     var value = 0;
+    var paths = [];
 
     _.each(data.diffList, function(diff) {
       for(var i = 0; i < diff.numDeltas(); ++i) {
@@ -131,11 +148,18 @@ exports.NewFiles = {
         if(gitUtils.isDeltaNormalFile(delta) && !gitUtils.isDeltaBinaryFile(delta)) {
           if(gitUtils.isDeltaNewFile(delta)) {
             //console.log("blah", delta.newFile);
-            value += config.rewardPerNewFile;
+            //value += config.rewardPerNewFile;
+            //data.stock.newFile();
+            paths.push(delta.newFile().path());
+            //console.log("new file:", delta.newFile().path());
           }
         }
       }
     });
+
+    paths = _.uniq(paths);
+    value = paths.length * config.rewardPerNewFile;
+    data.stock.newFiles += paths.length;
 
     if(value > 0 && value > config.maxReward) {
       value = config.maxReward;
@@ -161,6 +185,11 @@ exports.BinaryFiles = {
   },
 
   processCommit: function(commit, config, data, next) {
+    if(commit.parentcount() == 2) {
+      return next();
+    }
+
+
     var self = this;
     var value = 0;
 
@@ -185,71 +214,33 @@ exports.BinaryFiles = {
   }
 };
 
-/*
+
+
 exports.FileAdditions = {
   id: "commit.files.addition",
 
   config: {
     rewardPerLine: 1,
+    minNewLineLength: 5,
     maxRewardPerFile: 100,
-    maxRewardPerCommit: 500
+    maxRewardPerCommit: 500,
+    maxNewLineLength: 79
   },
 
   addition: '+'.charCodeAt(0),
   removal: '-'.charCodeAt(0),
+  context: ' '.charCodeAt(0),
 
-  getDiffStats: function(diff, paths) {
-    var self = this;
-
-    return diff.patches().then(function(patches) {
-      console.log("got patches");
-      return Promise.all(_.map(patches, function(patch) { return patch.hunks(); }));
-    }).then(function(hunksList) {
-      // hunksList is a list of list<hunks>
-      var promises = [];
-      hunksList.forEach(function(hunks) {
-        hunks.forEach(function(hunk) {
-          console.log("hunk");
-          if(paths.indexOf(gitUtils.getDiffFile(hunk).path()) >= 0) {
-            console.log('found hunk');
-            promises.push(hunk.lines());
-          }
-        });
-      });
-      return Promise.all(promises);
-    }).then(function(linesList) {
-      // linesList is a list of list<line>
-      var ret = {
-        additions: 0,
-        removals: 0
-      };
-
-      linesList.forEach(function(lines) {
-        lines.forEach(function(line) {
-          console.log("line:", line);
-          if(line.origin() == self.addition) {
-            console.log("add:", line.content());
-            ret.additions += 1;
-          } else if(line.origin() == self.removal) {
-            console.log("rm: ", line.content());
-            ret.removals += 1;
-          }
-        });
-      });
-
-      return ret;
-    });
+  rewardLine: function(line, config) {
+    var len =line.content().trim().length;
+    return len >= config.minNewLineLength && (
+      config.maxNewLineLength == 0 || len <= config.maxNewLineLength
+    );
   },
 
-  processCommit: function(commit, config, data, next) {
-    var value = 0;
-    var self = this;
-
-    var promises = [];
-
-    _.each(data.diffList, function(diff) {
-      var paths = [];
-
+  getModifiedPaths: function(diffList) {
+    var paths = [];
+    diffList.forEach(function(diff) {
       for(var i = 0; i < diff.numDeltas(); ++i) {
         var delta = diff.getDelta(i);
         if(!gitUtils.isDeltaNormalFile(delta) || gitUtils.isDeltaBinaryFile(delta)) {
@@ -260,28 +251,103 @@ exports.FileAdditions = {
           // TODO
         } else if(gitUtils.isDeltaNewFile(delta)) {
           // TODO
-        } else {
-          console.log("diff file:", delta.newFile().path());
+        } else if(!gitUtils.isDeltaRenamedFile(delta)) {
+          //console.log("diff file:", delta.newFile().path());
           paths.push(delta.newFile().path());
         }
       }
-
-      if(paths.length > 0) {
-        promises.push(self.getDiffStats(diff, paths));
-      }
     });
 
-    if(promises.length > 0) {
-      Promise.all(promises).then(function(stats) {
-        next();
-      }).catch(function(err) {
-        console.log("here error");
-        console.trace(err);
-      });
-    } else {
-      next();
-    }
-  }
+    return paths;
+  },
 
+  processCommit: function(commit, config, data, next) {
+    if(commit.parentcount() == 2) {
+      return next();
+    }
+
+
+    var value = 0;
+    var self = this;
+
+    var paths = this.getModifiedPaths(data.diffList);
+    var reward = 0;
+
+    if(paths.length == 0) {
+      next();
+      return;
+    }
+
+    Promise.all(_.map(data.diffList, function(diff) {
+      // Get the list of patches for each diff
+      return diff.patches();
+    })).then(function(patchesList) {
+      var promises = [];
+      // For each patch, determine if the patch applies to a modified text
+      // file and, if it does, get the patch's hunks
+      patchesList.forEach(function(patches) {
+        patches.forEach(function(patch) {
+          var diffFile = gitUtils.getDiffFile(patch);
+          if(diffFile && paths.indexOf(diffFile.path()) >= 0) {
+            // patch is a modified text file
+            promises.push(patch.hunks());
+          }
+        });
+      });
+
+      return Promise.all(promises);
+    }).then(function(hunksList) {
+      // For each hunk, get the list of lines
+      var promises = [];
+      hunksList.forEach(function(hunks) {
+        hunks.forEach(function(hunk) {
+          promises.push(hunk.lines());
+        });
+      });
+
+      return Promise.all(promises);
+    }).then(function(linesList) {
+      return _.flatten(linesList, true);
+    }).then(function(lines) {
+      // Finally, each line in the lines list applies to a modified text file.
+      // Iterate over the diff, rewarding new lines that match the config
+      // standards.
+      lines.forEach(function(line) {
+        if(line.origin() == self.addition && self.rewardLine(line, config)) {
+          reward += config.rewardPerLine;
+          data.stock.additions += 1;
+          //console.log('+', line.content());
+        } else if(line.origin() == self.removal && self.rewardLine(line, config)) {
+          data.stock.removals += 1;
+        }
+      });
+    }).then(function() {
+      if(reward > 0) {
+        if(reward > config.maxRewardPerCommit) {
+          reward = config.maxRewardPerCommit;
+        }
+
+        data.log(self.id, reward);
+      }
+
+      next();
+    });
+  }
 }
-*/
+
+exports.Merge = {
+  id: 'commit.merge',
+
+  config: {
+    reward: 10
+  },
+
+  processCommit: function(commit, config, data, next) {
+    if(commit.parentcount() == 2) {
+      data.log(this.id, config.reward);
+      data.stock.merges += 1;
+    }
+
+    next();
+  }
+};
