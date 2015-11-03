@@ -18,6 +18,7 @@
   "homepage": "https://github.com/ameily/git-stock",
   "dependencies": {
     "ansi": "^0.3.0",
+    "moment": "^2.10.6",
     "nodegit": "^0.5.0",
     "promise": "^7.0.4",
     "underscore": "^1.8.3",
