@@ -7,6 +7,7 @@ var PluginPipeline = require('./pipeline');
 var Stock = require('./stock');
 var ansi = require('ansi');
 var moment = require('moment');
+var minimatch = require('minimatch');
 var cursor = ansi(process.stdout);
 
 
@@ -14,12 +15,23 @@ function MarketDriver(options) {
   this.path = options.path;
   this.config = options.config;
   this.plugins = options.plugins;
+  this.ignore = options.ignore || [];
   this.repo = null;
   this.stocks = {};
   this.commits = 0;
   this.commitHistory = {};
 }
 
+MarketDriver.prototype.pathMatches = function(path) {
+  var b = true;
+  this.ignore.forEach(function(mask) {
+    if(minimatch(path, mask)) {
+      b = false;
+    }
+  });
+
+  return b && path;
+};
 
 MarketDriver.prototype.init = function() {
   var self = this;
@@ -129,7 +141,7 @@ MarketDriver.prototype._getFilePaths = function(tree) {
   var promise;
 
   tree.entries().forEach(function(entry) {
-    if(entry.isFile()) {
+    if(entry.isFile() && self.pathMatches(entry.path())) {
       blobPaths.push(entry.path());
       blobList.push(entry.getBlob());
     } else if(entry.isTree()) {
@@ -172,11 +184,8 @@ MarketDriver.prototype._calcAverageLineLifespanInBlame = function(blame, now) {
   var totalAge = 0;
   var totalLineCount = 0;
 
-  console.log("_calcAverageLineLifespanInBlame:", blame.getHunkCount());
-
   for(var i = 0; i < blame.getHunkCount(); ++i) {
     var hunk = blame.getHunkByIndex(i);
-    console.log("linesInHunk:", hunk.linesInHunk());
     totalLineCount += hunk.linesInHunk();
     commitLineCount.push(hunk.linesInHunk());
     commitList.push(self.repo.getCommit(hunk.finalCommitId()));
@@ -215,14 +224,12 @@ MarketDriver.prototype.calcAverageLineLifespan = function(hash) {
       return git.Blame.file(self.repo, path, opts);
     }));
   }).then(function(blames) {
-    console.log("got blames:", blames.length);
     return Promise.all(
       _.map(blames, function(blame) {
         return self._calcAverageLineLifespanInBlame(blame, now);
       })
     );
   }).then(function(results) {
-    console.log("got results");
     var r = {
       totalAge: 0,
       totalLineCount: 0
