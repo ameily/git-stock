@@ -30,7 +30,7 @@ MarketDriver.prototype.pathMatches = function(path) {
     }
   });
 
-  return b && path;
+  return b;
 };
 
 MarketDriver.prototype.init = function() {
@@ -183,6 +183,7 @@ MarketDriver.prototype._calcAverageLineLifespanInBlame = function(blame, now) {
   var self = this;
   var totalAge = 0;
   var totalLineCount = 0;
+  var stocks = {};
 
   for(var i = 0; i < blame.getHunkCount(); ++i) {
     var hunk = blame.getHunkByIndex(i);
@@ -195,12 +196,20 @@ MarketDriver.prototype._calcAverageLineLifespanInBlame = function(blame, now) {
     _.zip(commitLineCount, commits).forEach(function(entry) {
       // entry[0] => line count used from commit
       // entry[1] => commit object
+      var email = entry[1].author().email();
       totalAge += (now - entry[1].timeMs()) * entry[0];
+
+      if(email in stocks) {
+        stocks[email] += entry[0];
+      } else {
+        stocks[email] = entry[0];
+      }
     });
 
     return {
       totalAge: totalAge,
-      totalLineCount: totalLineCount
+      totalLineCount: totalLineCount,
+      stocks: stocks
     };
   });
 };
@@ -220,7 +229,7 @@ MarketDriver.prototype.calcAverageLineLifespan = function(hash) {
     return Promise.all(_.map(paths, function(path) {
       var opts = new git.BlameOptions();
       opts.newestCommit = commit.id();
-
+      console.log(">>", path);
       return git.Blame.file(self.repo, path, opts);
     }));
   }).then(function(blames) {
@@ -232,17 +241,30 @@ MarketDriver.prototype.calcAverageLineLifespan = function(hash) {
   }).then(function(results) {
     var r = {
       totalAge: 0,
-      totalLineCount: 0
+      totalLineCount: 0,
+      stocks: {}
     };
 
     results.forEach(function(result) {
       r.totalAge += result.totalAge;
       r.totalLineCount += result.totalLineCount;
+
+      for(var email in result.stocks) {
+        if(email in r.stocks) {
+          r.stocks[email] += result.stocks[email];
+        } else {
+          r.stocks[email] = result.stocks[email];
+        }
+      }
     });
 
     console.log("total age:", r.totalAge);
     console.log("total lines:", r.totalLineCount);
     console.log("Avg Line Age:", (r.totalAge / r.totalLineCount / 1000 / 60 / 60 / 24).toFixed(2), "days");
+
+    for(var email in r.stocks) {
+      console.log(">>", email, "=>", r.stocks[email], ";", (r.stocks[email] / r.totalLineCount * 100.0).toFixed(2));
+    }
   });
 };
 
