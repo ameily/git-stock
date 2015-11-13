@@ -14,6 +14,9 @@ function Commit(data) {
   this.sha = data.sha;
   this.message = data.message;
   this.timestamp = data.timestamp;
+  this.stock = data.stock || null;
+  this.branch = data.branch || null;
+  this.market = data.market || null;
 
   this.dividends = data.dividends || [];
   this.isMerge = data.isMerge || false;
@@ -51,6 +54,23 @@ Commit.prototype.serialize = function() {
     modFiles: this.modFiles,
     value: this.value
   };
+};
+
+Commit.prototype.log = function(id, value) {
+  this.dividends.push({ id: id, value: value });
+  this.value += value;
+  return this;
+};
+
+Commit.prototype.updateStock = function() {
+  mergeDividends(this.stock.dividends, this.dividends);
+
+  this.stock.value += this.value;
+  this.stock.additions += this.additions;
+  this.stock.removals += this.removals;
+  this.stock.newFiles = _.uniq(this.stock.newFiles.concat(this.newFiles));
+  this.stock.delFiles = _.uniq(this.stock.delFiles.concat(this.delFiles));
+  this.stock.modFiles = _.uniq(this.stock.modFiles.concat(this.modFiles));
 };
 
 exports.Commit = Commit;
@@ -238,6 +258,8 @@ function Stock(data) {
   this.merges = data.merges || 0;
   /// Plugin reward breakdown
   this.dividends = data.dividends || [];
+
+  this.firstCommitDate = data.firstCommitDate || null;
 }
 
 Stock.prototype.mergeDayTrading = function(stock) {
@@ -273,7 +295,8 @@ Stock.prototype.serialize = function() {
     modFiles: this.modFiles,
     commits: this.commits,
     merges: this.merges,
-    dividends: this.dividends
+    dividends: this.dividends,
+    firstCommitDate: this.firstCommitDate
   };
 }
 
@@ -330,15 +353,15 @@ StockDayTrading.prototype.serialize = function() {
   };
 };
 
-StockDayTrading.prototype.pollCommit = function(commit) {
-  this.value += commit.value;
-  this.additions += commit.additions;
-  this.removals += commit.removals;
-  this.newFiles = _.uniq(this.newFiles.concat(commit.newFiles));
-  this.delFiles = _.uniq(this.delFiles.concat(commit.delFiles));
-  this.modFiles = _.uniq(this.modFiles.concat(commit.modFiles));
-  mergeDividends(this.dividends, commit.dividends);
-};
+// StockDayTrading.prototype.pollCommit = function(commit) {
+//   this.value += commit.value;
+//   this.additions += commit.additions;
+//   this.removals += commit.removals;
+//   this.newFiles = _.uniq(this.newFiles.concat(commit.newFiles));
+//   this.delFiles = _.uniq(this.delFiles.concat(commit.delFiles));
+//   this.modFiles = _.uniq(this.modFiles.concat(commit.modFiles));
+//   mergeDividends(this.dividends, commit.dividends);
+// };
 
 
 /*****************************************************************************
@@ -351,8 +374,11 @@ function mergeDividends(result, src) {
   src.forEach(function(srcDividend) {
     var found = _.filter(result, function(d) { return d.id == srcDividend.id; });
     if(found.length > 0) {
-      found[0].occurences += 1;
+      found[0].occurences += srcDividend.occurences || 1;
       found[0].value += srcDividend.value;
+      if(found.length > 1) {
+        console.log("Found more than 1");
+      }
     } else {
       result.push({
         id: srcDividend.id,

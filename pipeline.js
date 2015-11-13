@@ -1,6 +1,5 @@
 
-// TODO lifetime dividends incorrect
-// TODO lifetime / market merge count (merges)
+// TODO mail map support
 // TODO blame report
 
 var Commit = require('./models').Commit;

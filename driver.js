@@ -19,7 +19,7 @@ var writeFile = Promise.denodeify(fs.writeFile);
 
 var Commit = models.Commit,
     Market = models.Market,
-    Stock = models.Stock;
+    Stock  = models.Stock;
 
 
 function getDayKey(timeMs) {
@@ -32,6 +32,7 @@ function MarketDriver(options) {
   this.config = options.config;
   this.plugins = options.plugins;
   this.dest = options.dest;
+  this.silent = options.silent || false;
   this.ignore = options.ignore || [];
   this.repo = null;
 
@@ -43,7 +44,6 @@ function MarketDriver(options) {
   this._commitHashes = {};
   this.commitCount = 0;
   this.progress = null;
-  this.silent = options.silent || false;
 
   this.market = new Market({
     name: path.basename(this.path),
@@ -116,6 +116,10 @@ MarketDriver.prototype.addCommit = function(commit) {
   var date = getDayKey(commit.timeMs());
   var day = this._timelineBldr[date];
 
+  if(!stock.firstCommitDate || stock.firstCommitDate > date) {
+    stock.firstCommitDate = date;
+  }
+
   if(_.isUndefined(day)) {
     this._timelineBldr[date] = {
       date: date,
@@ -171,6 +175,8 @@ MarketDriver.prototype.run = function(branch) {
     self.print("Building timeline...     ");
     return self._buildTimeline();
   }).then(function() {
+    return self._writeFirstDay();
+  }).then(function() {
     self.print("Done\n")
 
     self.progress = new ProgressBar('Processing [:bar] :percent', {
@@ -198,7 +204,19 @@ MarketDriver.prototype.run = function(branch) {
   });
 };
 
+MarketDriver.prototype._writeFirstDay = function() {
+  var dayTrading = this.market.beginDayTrading();
+  var data = JSON.stringify({
+    day: dayTrading.serialize(),
+    lifetime: this.market.serialize()
+  }, null, '  ');
+
+  //console.log('after merge: %s', path.join(self.dest, day.date + ".json"));
+  return writeFile(path.join(this.dest, "0.json"), data);
+};
+
 MarketDriver.prototype._runDay = function(day, branch) {
+  //console.log("Day:", day.date);
   var self = this;
   // console.log("Processing day: %s", day.date);
 
@@ -234,16 +252,9 @@ MarketDriver.prototype._runDay = function(day, branch) {
 };
 
 MarketDriver.prototype._runCommit = function(commit, branch, dayTrading) {
+  //console.log("Commit:", commit.sha());
   var self = this;
   var stock = dayTrading.getStock(commit.author().email());
-  var obj = new Commit({
-    sha: commit.sha(),
-    message: commit.message(),
-    timestamp: commit.timeMs(),
-    isMerge: commit.parentcount() > 1
-  });
-
-  stock.commits.push(obj);
 
   var pipeline = new PluginPipeline({
     branch: branch,
@@ -253,6 +264,9 @@ MarketDriver.prototype._runCommit = function(commit, branch, dayTrading) {
     plugins: this.plugins,
     stock: stock
   });
+
+  // pipeline.data is a Commit object
+  stock.commits.push(pipeline.data);
 
   return commit.getDiff().then(function(diffList) {
     pipeline.data.diffList = diffList;
@@ -269,10 +283,13 @@ MarketDriver.prototype._runCommit = function(commit, branch, dayTrading) {
     var promise = new Promise(function(resolve, reject) {
       pipeline.on('end', function() {
         // update commit object
-        obj.mergePipeline(pipeline);
-        stock.pollCommit(obj);
+        //console.log(pipeline.data);
+        // obj.mergePipeline(pipeline);
+
+        // stock.pollCommit();
 
         self.progress.tick();
+        pipeline.data.updateStock();
 
         resolve();
       }).on('error', function(err) {
