@@ -322,10 +322,10 @@ var FileAdditions = {
       lines.forEach(function(line) {
         if(line.origin() == self.addition && self.rewardLine(line, config)) {
           reward += config.rewardPerLine;
-          data.stock.additions += 1;
+          data.additions += 1;
           //console.log('+', line.content());
         } else if(line.origin() == self.removal && self.rewardLine(line, config)) {
-          data.stock.removals += 1;
+          data.removals += 1;
         }
       });
     }).then(function() {
