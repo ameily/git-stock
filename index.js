@@ -66,6 +66,7 @@ try {
 
 
 var config = new GitStockConfig();
+config.register(Plugins);
 
 var driver = new MarketDriver({
   path: options.input,
