@@ -21,6 +21,7 @@
     "minimatch": "^3.0.0",
     "moment": "^2.10.6",
     "nodegit": "^0.5.0",
+    "progress": "^1.1.8",
     "promise": "^7.0.4",
     "underscore": "^1.8.3",
     "verror": "^1.6.0"

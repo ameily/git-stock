@@ -1,4 +1,8 @@
 
+// TODO lifetime dividends incorrect
+// TODO lifetime / market merge count (merges)
+// TODO blame report
+
 var util = require('util');
 var EventEmitter = require('events').EventEmitter;
 var VError = require('verror');
@@ -10,24 +14,27 @@ function PluginPipeline(options) {
   this.plugins = options.plugins;
   this.config = options.config;
   this.commit = options.commit;
-  this.journal = [];
   this.index = -1;
   this.delta = 0;
 
   this.data = {
     branch: options.branch,
     market: options.market,
-    diffList: options.diffList,
     stock: options.stock,
+    additions: 0,
+    removals: 0,
+    newFiles: [],
+    delFiles: [],
+    modFiles: [],
     journal: [],
     log: function(id, value) {
       this.journal.push({ id: id, value: value });
-      this.stock.log(id, value);
       pipe.delta += value;
     }
   };
 
-  this.data.stock.commits += 1;
+  //this.data.stock.commits += 1;
+  //this.data.stock.commits.push(options.commit);
 
   EventEmitter.call(this);
 }

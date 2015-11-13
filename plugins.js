@@ -2,8 +2,47 @@
 var _ = require('underscore');
 var gitUtils = require('./git-utils');
 
+var FileModifications = {
+  id: 'commit.file.mods',
+  name: "File modifications",
+  description: "Track added, removed, and modified file paths",
 
-exports.BaseCommit = {
+  processCommit: function(commit, config, data, next) {
+    if(commit.parentcount() > 1) {
+      return next();
+    } else if(false) {
+      data.newFiles.push("awdf");
+      data.delFiles.push("awdf");
+      data.modFiles.push("awdf");
+      return next();
+    }
+
+    var self = this;
+    _.each(data.diffList, function(diff) {
+      for(var i = 0; i < diff.numDeltas(); ++i) {
+        var delta = diff.getDelta(i);
+
+        if(gitUtils.isDeltaNormalFile(delta) && !gitUtils.isDeltaBinaryFile(delta)) {
+          if(gitUtils.isDeltaNewFile(delta)) {
+            data.newFiles.push(delta.newFile().path());
+          } else if(gitUtils.isDeltaDeletedFile(delta)) {
+            data.delFiles.push(delta.oldFile().path());
+          } else if(gitUtils.isDeltaModifiedFile(delta)) {
+            data.modFiles.push(delta.newFile().path());
+          }
+        }
+      }
+    });
+
+    data.newFiles = _.uniq(data.newFiles);
+    data.delFiles = _.uniq(data.delFiles);
+    data.modFiles = _.uniq(data.modFiles);
+
+    next();
+  }
+};
+
+var BaseCommit = {
   id: "commit",
   name: "Commit reward",
   description: "Base reward for a single commit",
@@ -20,7 +59,7 @@ exports.BaseCommit = {
 
 
 
-exports.WellformedMessage = {
+var WellformedMessage = {
   id: "commit.message",
   name: "Commit subject reward",
   description: "Check for valid and wellformed commit subject and body",
@@ -32,7 +71,7 @@ exports.WellformedMessage = {
   },
 
   processCommit: function(commit, config, data, next) {
-    if(commit.parentcount() == 2) {
+    if(commit.parentcount() > 1) {
       return next();
     }
 
@@ -66,7 +105,7 @@ exports.WellformedMessage = {
   }
 };
 
-exports.IssueReferences = {
+var IssueReferences = {
   id: 'commit.message.issue',
 
   config: {
@@ -121,7 +160,7 @@ exports.IssueReferences = {
 };
 
 
-exports.NewFiles = {
+var NewFiles = {
   id: "commit.file.new",
 
   config: {
@@ -132,39 +171,14 @@ exports.NewFiles = {
   },
 
   processCommit: function(commit, config, data, next) {
-    if(commit.parentcount() == 2) {
+    if(commit.parentcount() > 1) {
       return next();
     }
 
-
-    var self = this;
-    var value = 0;
-    var paths = [];
-
-    _.each(data.diffList, function(diff) {
-      for(var i = 0; i < diff.numDeltas(); ++i) {
-        var delta = diff.getDelta(i);
-
-        if(gitUtils.isDeltaNormalFile(delta) && !gitUtils.isDeltaBinaryFile(delta)) {
-          if(gitUtils.isDeltaNewFile(delta)) {
-            //console.log("blah", delta.newFile);
-            //value += config.rewardPerNewFile;
-            //data.stock.newFile();
-            paths.push(delta.newFile().path());
-            //console.log("new file:", delta.newFile().path());
-          }
-        }
-      }
-    });
-
-    paths = _.uniq(paths);
-    value = paths.length * config.rewardPerNewFile;
-    data.stock.newFiles += paths.length;
+    var value = data.newFiles.length * config.rewardPerNewFile;
 
     if(value > 0 && value > config.maxReward) {
       value = config.maxReward;
-    } else if(value < 0 && value < config.maxPenalty) {
-      value = config.maxPenalty;
     }
 
     if(value != 0) {
@@ -176,7 +190,7 @@ exports.NewFiles = {
 };
 
 
-exports.BinaryFiles = {
+var BinaryFiles = {
   id: "commit.file.binary",
 
   config: {
@@ -185,7 +199,7 @@ exports.BinaryFiles = {
   },
 
   processCommit: function(commit, config, data, next) {
-    if(commit.parentcount() == 2) {
+    if(commit.parentcount() > 1) {
       return next();
     }
 
@@ -198,7 +212,6 @@ exports.BinaryFiles = {
         var delta = diff.getDelta(i);
         if(gitUtils.isDeltaNewFile(delta) && gitUtils.isDeltaBinaryFile(delta)) {
           value += config.penalty;
-          console.log("Binary file:", delta.newFile().path());
         }
       }
     });
@@ -216,7 +229,7 @@ exports.BinaryFiles = {
 
 
 
-exports.FileAdditions = {
+var FileAdditions = {
   id: "commit.files.addition",
 
   config: {
@@ -252,7 +265,6 @@ exports.FileAdditions = {
         } else if(gitUtils.isDeltaNewFile(delta)) {
           // TODO
         } else if(!gitUtils.isDeltaRenamedFile(delta)) {
-          //console.log("diff file:", delta.newFile().path());
           paths.push(delta.newFile().path());
         }
       }
@@ -335,7 +347,7 @@ exports.FileAdditions = {
   }
 }
 
-exports.Merge = {
+var Merge = {
   id: 'commit.merge',
 
   config: {
@@ -345,9 +357,19 @@ exports.Merge = {
   processCommit: function(commit, config, data, next) {
     if(commit.parentcount() == 2) {
       data.log(this.id, config.reward);
-      data.stock.merges += 1;
+      //data.stock.merges += 1;
     }
 
     next();
   }
 };
+
+exports.__all__ = [
+  FileModifications,
+  BaseCommit,
+  WellformedMessage,
+  IssueReferences,
+  NewFiles,
+  BinaryFiles,
+  FileAdditions
+];

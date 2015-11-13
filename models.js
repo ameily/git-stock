@@ -1,137 +1,364 @@
 
 var _ = require('underscore');
+var moment = require('moment');
 
 
 
-function StockSummary(options) {
-  this.email = options.email;
-  this.name = options.name;
-
-  this.timestamp = options.timestamp || null;
-  this.value = options.value || 0;
-  this.additions = options.additions || 0;
-  this.removals = options.removals || 0;
-  this.commits = options.commits || 0;
-  this.merges = options.merges || 0;
-
-  this.plugins = {};
-
-  this.totalLineCount = options.lineCount || 0;
-  this.totalLineAge = options.totalLineAge || 0;
-  this.avgLineAge = options.avgLineAge || null;
+function StockRecord(data) {
+  this.totalLineCount = data.totalLineCount || 0;
+  this.totalLineAge = data.totalLineAge || 0;
+  this.avgLineAge = data.avgLineAge || null;
 }
 
-StockSummary.prototype.calculateAvgLineAge = function() {
-  return this.avgLineAge != null ? this.avgLineAge : (
-    this.totalLineCount > 0 ? this.totalLineAge / this.totalLineCount : 0
-  );
+function Commit(data) {
+  this.sha = data.sha;
+  this.message = data.message;
+  this.timestamp = data.timestamp;
+
+  this.dividends = data.dividends || [];
+  this.isMerge = data.isMerge || false;
+
+  this.additions = data.additions || 0;
+  this.removals = data.removals || 0;
+  this.newFiles = data.newFiles || [];
+  this.delFiles = data.delFiles || [];
+  this.modFiles = data.modFiles || [];
+
+  this.value = data.value || 0;
+}
+
+Commit.prototype.mergePipeline = function(pipeline) {
+  this.dividends = pipeline.data.journal;
+  this.removals = pipeline.data.removals;
+  this.additions = pipeline.data.additions;
+  this.newFiles = pipeline.data.newFiles;
+  this.modFiles = pipeline.data.modFiles;
+  this.delFiles = pipeline.data.delFiles;
+  this.value = pipeline.delta
 };
 
-StockSummary.prototype.addLines = function(count, timestamp) {
-  this.totalLineCount += count;
-  this.totalLineAge = count * timestamp;
+Commit.prototype.serialize = function() {
+  return {
+    sha: this.sha,
+    message: this.message,
+    timestamp: this.timestamp,
+    dividends: this.dividends,
+    isMerge: this.isMerge,
+    additions: this.additions,
+    removals: this.removals,
+    newFiles: this.newFiles,
+    delFiles: this.delFiles,
+    modFiles: this.modFiles,
+    value: this.value
+  };
 };
 
-StockSummary.prototype.log = function(id, value) {
-  if(_.isArray(id) && _.isUndefined(value)) {
-    var self = this;
-    id.forEach(function(entry) {
-      self.log(entry[0])
-    });
-  }
+exports.Commit = Commit;
 
-  var plugin = this.plugins[id];
-  if(!plugin) {
-    plugin = this.plugins[id] = {
-      id: id,
-      count: 0,
-      value: 0
-    };
-  }
-  this.value += value;
+/****************************************************************************
+ *
+ * Market Lifetime
+ *
+ ****************************************************************************/
 
-  plugin.count += 1;
-  plugin.value += value;
-};
+function Market(data) {
+  this.name = data.name || null;
+  this.stocks = data.stocks || [];
+  this.additions = data.additions || 0;
+  this.removals = data.removals || 0;
+  this.commits = data.commits || 0;
+  this.merges = data.merges || 0;
+  this.value = data.value || 0;
+  this.dividends = data.dividends || [];
 
-StockSummary.prototype.fork = function() {
-  return new StockSummary({
-    email: this email,
+  this.record = null;
+}
+
+Market.prototype.beginDayTrading = function(date) {
+  this.record = null;
+
+  return new MarketDayTrading({
     name: this.name,
-    value: this.value,
+    date: date,
+    stocks: _.map(this.stocks, function(stock) {
+      return stock.beginDayTrading(date);
+    })
+  });
+};
+
+Market.prototype.mergeDayTrading = function(dt) {
+  this.additions += dt.additions;
+  this.removals += dt.removals;
+  this.commits += dt.commits;
+  this.merges += dt.merges;
+  this.newFiles += dt.newFiles;
+  this.delFiles += dt.delFiles;
+  this.modFiles += dt.modFiles;
+  this.value += dt.value;
+
+  _.zip(this.stocks, dt.stocks).forEach(function(entry) {
+    entry[0].mergeDayTrading(entry[1]);
+  });
+
+  mergeDividends(this.dividends, dt.dividends);
+};
+
+Market.prototype.serialize = function() {
+  return {
+    name: this.name,
+    stocks: _.map(this.stocks, function(stock) { return stock.serialize(); }),
     additions: this.additions,
     removals: this.removals,
     commits: this.commits,
-    merges: this.merges
-  });
+    merges: this.merges,
+    value: this.value,
+    dividends: this.dividends,
+    record: this.record ? this.record.serialize() : null
+  };
 };
 
-///////////////////////////////////////////////////////////////////////////////
+exports.Market = Market;
 
-function MarketSummary(options) {
-  this.timestamp = options.timestamp;
-  this.branch = options.branch;
-  this.value = options.value || 0;
-  this.files = options.files || 0;
-  this.commits = options.commits || 0;
-
-  this.totalLineCount = 0;
-  this.totalLineAge = 0;
-
-  this.stocks = options.stocks || [];
-  this.stockLookup = {};
+/****************************************************************************
+ *
+ * Market Day Trading
+ *
+ ****************************************************************************/
+function MarketDayTrading(data) {
+  this.name = data.name;
+  this.date = data.date;
+  this.stocks = data.stocks || []; // list of stock objects
+  this.additions = data.additions || 0;
+  this.commits = data.commits || 0;
+  this.merges = data.merges || 0;
+  this.removals = data.removals || 0;
+  this.newFiles = data.newFiles || 0;
+  this.delFiles = data.delFiles || 0;
+  this.modFiles = data.modFiles || 0;
+  this.value = data.value || 0;
+  this.dividends = data.dividends || [];
 }
 
-MarketSummary.prototype._buildStockLookup = function() {
-  var self = this;
-
-  this.stockLookup = {};
-  this.stocks.forEach(function(stock) {
-    self.stockLookup[stock.email] = stock;
-  });
-};
-
-MarketSummary.prototype.getStock = function(email, name) {
-  var stock = this.stockLookup[email];
-  if(!stock) {
-    stock = this.stockLookup[email] = new StockSummary({
-      email: email,
-      name: name,
-      branch: this.branch
-    });
+MarketDayTrading.prototype.getStock = function(email) {
+  for(var i in this.stocks) {
+    var stock = this.stocks[i];
+    if(stock.email == email) {
+      return stock;
+    }
   }
 
-  return stock;
+  return null;
 };
 
-MarketSummary.prototype.fork = function() {
-  var market = new MarketSummary({
-    branch: this.branch,
-    value: this.value,
-    files: this.files,
-    commits: this.commits,
-    stocks: _.map(this.stocks, function(stock) { return stock.fork(); }),
-    plugins: _.clone(this.plugins)
+MarketDayTrading.prototype.getCommits = function() {
+  return _.flatten(_.map(this.stocks, function(stock) {
+    return stock.commits;
+  }));
+};
+
+MarketDayTrading.prototype.getNewFiles = function() {
+  return _.flatten(_.map(this.stocks, function(stock) {
+    return stock.newFiles;
+  }));
+};
+
+MarketDayTrading.prototype.getDelFiles = function() {
+  return _.flatten(_.map(this.stocks, function(stock) {
+    return stock.delFiles
+  }));
+};
+
+MarketDayTrading.prototype.getModFiles = function() {
+  return _.flatten(_.map(this.stocks, function(stock) {
+    return stock.modFiles
+  }));
+};
+
+MarketDayTrading.prototype.pollStocks = function() {
+  var self = this;
+  this.stocks.forEach(function(stock) {
+    self.newFiles += stock.newFiles.length;
+    self.modFiles += stock.modFiles.length;
+    self.delFiles += stock.delFiles.length;
+    self.additions += stock.additions;
+    self.removals += stock.removals;
+    self.commits += stock.commits.length;
+    self.merges += _.filter(stock.commits, function(c) { return c.isMerge; }).length;
+    self.value += stock.value;
+
+    mergeDividends(self.dividends, stock.dividends);
   });
-
-  market._buildStockLookup();
-
-  return market;
 };
 
-MarketSummary.prototype.log = function(id, value) {
-  this.plugins[id] = (this.plugins[id] || 0) + value;
-  this.value += value;
+MarketDayTrading.prototype.serialize = function() {
+  return {
+    name: this.name,
+    date: this.date,
+    stocks: _.map(this.stocks, function(stock) { return stock.serialize(); }),
+    additions: this.additions,
+    removals: this.removals,
+    newFiles: this.newFiles,
+    delFiles: this.delFiles,
+    modFiles: this.modFiles,
+    commits: this.commits,
+
+    value: this.value,
+    dividends: this.dividends
+  };
 };
 
-MarketSummary.prototype.addLines = function(count, commit) {
-  var stock = this.getStock(commit.author().email());
-  stock.addLines(count, commit.timeMs());
 
-  this.totalLineCount += count;
-  this.totalLineTimestamp += commit.timeMs();
+
+/*****************************************************************************
+*
+* Stock lifetime
+*
+******************************************************************************/
+function Stock(data) {
+  /// Stock name
+  this.name = data.name;
+  /// Stock email
+  this.email = data.email;
+  /// Stock value
+  this.value = data.value || 0;
+
+  /// Number of additions
+  this.additions = data.additions || 0;
+  /// Number of removals
+  this.removals = data.removals || 0;
+  // Number of files created
+  this.newFiles = data.newFiles || 0;
+  // Number of files deleted
+  this.delFiles = data.delFiles || 0;
+  // Number of files modified
+  this.modFiles = data.modFiles || 0;
+
+  /// Number of commits
+  this.commits = data.commits || 0;
+  this.merges = data.merges || 0;
+  /// Plugin reward breakdown
+  this.dividends = data.dividends || [];
+}
+
+Stock.prototype.mergeDayTrading = function(stock) {
+  this.additions += stock.additions;
+  this.removals += stock.removals;
+  this.commits += stock.commits.length;
+  this.merges += _.filter(stock.commits, function(c) { return c.isMerge; }).length;
+  this.newFiles += stock.newFiles.length;
+  this.delFiles += stock.delFiles.length;
+  this.modFiles += stock.modFiles.length;
+  this.value += stock.value;
+
+  mergeDividends(this.dividends, stock.dividends);
+};
+
+Stock.prototype.beginDayTrading = function(date) {
+  return new StockDayTrading({
+    date: date,
+    name: this.name,
+    email: this.email
+  });
+};
+
+Stock.prototype.serialize = function() {
+  return {
+    name: this.name,
+    email: this.email,
+    value: this.value,
+    additions: this.additions,
+    removals: this.removals,
+    newFiles: this.newFiles,
+    delFiles: this.delFiles,
+    modFiles: this.modFiles,
+    commits: this.commits,
+    merges: this.merges,
+    dividends: this.dividends
+  };
+}
+
+exports.Stock = Stock;
+
+
+/*****************************************************************************
+*
+* Stock Day Trading
+*
+******************************************************************************/
+
+function StockDayTrading(data) {
+  /// Date
+  this.date = data.date;
+  /// Stock name
+  this.name = data.name;
+  /// Stock email address
+  this.email = data.email;
+
+  /// Stock value
+  this.value = data.value || 0;
+
+  /// Number of additions
+  this.additions = data.additions || 0;
+  /// Number of removals
+  this.removals = data.removals || 0;
+  this.newFiles = data.newFiles || [];
+  this.delFiles = data.delFiles || [];
+  this.modFiles = data.modFiles || [];
+
+  /// Plugin reward breakdown for the day
+  this.dividends = data.dividends || [];
+
+  /// Commits
+  this.commits = data.commits || [];
+}
+
+StockDayTrading.prototype.serialize = function() {
+  return {
+    date: this.date,
+    name: this.name,
+    email: this.email,
+    value: this.value,
+    additions: this.additions,
+    removals: this.removals,
+    newFiles: this.newFiles,
+    delFiles: this.delFiles,
+    modFiles: this.modFiles,
+    commits: _.map(this.commits, function(commit) {
+      return commit.serialize();
+    }),
+    dividends: this.dividends
+  };
+};
+
+StockDayTrading.prototype.pollCommit = function(commit) {
+  this.value += commit.value;
+  this.additions += commit.additions;
+  this.removals += commit.removals;
+  this.newFiles = _.uniq(this.newFiles.concat(commit.newFiles));
+  this.delFiles = _.uniq(this.delFiles.concat(commit.delFiles));
+  this.modFiles = _.uniq(this.modFiles.concat(commit.modFiles));
+  mergeDividends(this.dividends, commit.dividends);
 };
 
 
-/*
-*/
+/*****************************************************************************
+*
+* Util functions
+*
+******************************************************************************/
+
+function mergeDividends(result, src) {
+  src.forEach(function(srcDividend) {
+    var found = _.filter(result, function(d) { return d.id == srcDividend.id; });
+    if(found.length > 0) {
+      found[0].occurences += 1;
+      found[0].value += srcDividend.value;
+    } else {
+      result.push({
+        id: srcDividend.id,
+        occurences: srcDividend.occurences || 1,
+        value: srcDividend.value
+      });
+    }
+  });
+}
