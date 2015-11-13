@@ -10,11 +10,6 @@ var FileModifications = {
   processCommit: function(commit, config, data, next) {
     if(commit.parentcount() > 1) {
       return next();
-    } else if(false) {
-      data.newFiles.push("awdf");
-      data.delFiles.push("awdf");
-      data.modFiles.push("awdf");
-      return next();
     }
 
     var self = this;
