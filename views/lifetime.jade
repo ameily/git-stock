@@ -1,0 +1,186 @@
+extends layout
+
+block head
+  title Lifetime
+  script(src='/vendor/d3/d3.js')
+  script(src='/vendor/numeral/numeral.js')
+  
+  style.
+    path { 
+      stroke: steelblue;
+      stroke-width: 2;
+      fill: none;
+    }
+    
+    .axis path,
+    .axis line {
+      fill: none;
+      stroke: grey;
+      stroke-width: 1;
+      shape-rendering: crispEdges;
+    }
+    
+    .summary * {
+      text-align: center;
+    }
+
+block content
+  div.row
+    div.col-md-12
+      h1 Lifetime
+      svg#timeline
+      
+      hr
+  
+  div.row
+    div.col-md-4.summary#valueBlock
+    div.col-md-4.summary#commitsBlock
+    div.col-md-4.summary#contribsBlock
+
+
+block foot
+  script.
+    function drawLifetime(data) {
+      var margin = {
+        top: 20,
+        left: 80,
+        right: 20,
+        bottom: 30
+      };
+      
+      var height = 300 - margin.top - margin.bottom
+          width = $(".col-md-12").width() - margin.left - margin.right;
+      
+      var parseDate = d3.time.format("%Y%m%d").parse;
+      
+      var svg = d3.select("#timeline")
+        .attr("width", "100%")
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+          .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+      
+      // x axis scale
+      var x = d3.time.scale()
+        .range([0, width]);
+      
+      // y value axis scale
+      var valueY = d3.scale.linear()
+        .range([height, 0]);
+      
+      // x axis
+      var xAxis = d3.svg.axis()
+        .scale(x)
+        .orient("bottom");
+      
+      // y value axis
+      var valueAxis = d3.svg.axis()
+        .scale(valueY)
+        .orient("left");
+      
+      // value line
+      var valueLine = d3.svg.line()
+        .x(function(d) { return x(d.date); })
+        .y(function(d) { return valueY(d.value); });
+      
+      // create Date objects from their string value
+      var maxValue = 0;
+      data.forEach(function(d) {
+        d.date = parseDate(d.date);
+        maxValue = d.value < maxValue ? maxValue : d.value;
+      });
+      
+      // set the Y axis tick format
+      //- if(maxValue > 30000) {
+      //-   valueAxis.tickFormat(function(d) {
+      //-     return (d / 1000).toFixed(1).toString() + "K";
+      //-   });
+      //- }
+      valueAxis.tickFormat(function(d) {
+        return numeral(d).format('0,0[.]0a');
+      });
+      
+      // axis domains
+      x.domain(d3.extent(data, function(d) { return d.date; }));
+      valueY.domain([0, d3.max(data, function(d) { return d.value; })]);
+      
+      // value line
+      svg.append("path")
+        .datum(data)
+        .attr('d', valueLine);
+      
+      // x axis
+      svg.append("g")
+        .attr('class', "x axis")
+        .attr('transform', 'translate(0, ' + height + ')')
+        .call(xAxis);
+      
+      // y value axis
+      svg.append('g')
+        .attr('class', 'y axis')
+        .call(valueAxis);
+      
+      // y commit axis scale
+      //- var commitY = d3.scale.linear()
+      //-   .range([height, 0]);
+      
+      //- commitY.domain([0, d3.max(data, function(d) { return d.commits; })]);
+        
+      // y commit axis
+      //- var commitAxis = d3.svg.axis()
+      //-   .scale(commitY)
+      //-   .orient("right");
+      
+      // commit line
+      //- var commitLine = d3.svg.line()
+      //-   .x(function(d) { return x(d.date); })
+      //-   .y(function(d) { return commitY(d.commits); });
+      
+      // commit line
+      //- svg.append("path")
+      //-   .datum(data)
+      //-   .attr('d', commitLine);
+      
+      // y commit axis
+      //- svg.append('g')
+      //-   .attr('class', 'y axis')
+      //-   .attr('transform', 'translate(' + width + ', 0)')
+      //-   .call(commitAxis);
+    }
+    
+    function updateLatest(data) {
+      var value = data.lifetime.value;
+      
+      //- if(value > 1000) {
+      //-   value = (value / 1000).toFixed(2).toString() + "K";
+      //- } else {
+      //-   value = value.toString();
+      //- }
+      
+      $("#valueBlock").append(
+        $("<h2>").text(numeral(value).format('($0.00a)'))
+      ).append(
+        $("<h4>").text("Value")
+      );
+      
+      $("#contribsBlock").append(
+        $("<h2>").text(numeral(data.lifetime.stocks.length).format('0,0[.]00a'))
+      ).append(
+        $("<h4>").text("Contributors")
+      );
+      
+      $("#commitsBlock").append(
+        $("<h2>").text(numeral(data.lifetime.commits).format('0,0[.]00a'))
+      ).append(
+        $("<h4>").text("Commits")
+      );
+    }
+    
+    $(document).ready(function() {
+      d3.json('/api/v1/lifetime.json', function(err, data) {
+        drawLifetime(data);
+      });
+      
+      d3.json('/api/v1/latest.json', function(err, data) {
+        updateLatest(data);
+      });
+    }); 

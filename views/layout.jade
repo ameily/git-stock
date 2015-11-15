@@ -1,0 +1,15 @@
+doctype html
+html
+  head
+    link(rel='stylesheet', href='/vendor/bootstrap/dist/css/bootstrap.css')
+    link(rel='stylesheet', href='/vendor/bootstrap/dist/css/bootstrap-theme.css')
+    
+    script(src='/vendor/jquery/dist/jquery.js')
+    script(src='/vendor/bootstrap/dist/js/bootstrap.js')
+    
+    block head
+  body
+    div.container-fluid
+      block content
+
+    block foot

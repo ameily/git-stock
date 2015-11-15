@@ -1,0 +1,26 @@
+{
+  "name": "git-stock",
+  "description": "",
+  "main": "app.js",
+  "authors": [
+    "Adam Meily"
+  ],
+  "license": "ISC",
+  "homepage": "https://github.com/ameily/git-stock",
+  "moduleType": [
+    "globals"
+  ],
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "d3": "~3.5.8",
+    "bootstrap": "~3.3.5",
+    "numeral": "~1.5.3"
+  }
+}

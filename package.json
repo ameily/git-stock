@@ -18,6 +18,8 @@
   "homepage": "https://github.com/ameily/git-stock",
   "dependencies": {
     "ansi": "^0.3.0",
+    "express": "^4.13.3",
+    "jade": "^1.11.0",
     "minimatch": "^3.0.0",
     "moment": "^2.10.6",
     "node-getopt": "^0.2.3",
