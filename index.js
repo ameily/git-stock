@@ -4,9 +4,9 @@
 
 var Getopt = require('node-getopt');
 var fs = require('fs');
-var GitStockConfig = require('./config');
-var MarketDriver = require('./driver');
-var Plugins = require('./plugins').__all__;
+var GitStockConfig = require('./core/config');
+var MarketDriver = require('./core/driver');
+var Plugins = require('./core/plugins').__all__;
 
 
 var getopt = new Getopt([
