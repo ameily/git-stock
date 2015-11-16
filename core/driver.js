@@ -4,7 +4,6 @@ var Promise = require('promise');
 var util = require('util');
 var _ = require('underscore');
 var PluginPipeline = require('./pipeline');
-var Stock = require('./stock');
 var ansi = require('ansi');
 var moment = require('moment');
 var minimatch = require('minimatch');
@@ -15,6 +14,7 @@ var models = require('./models');
 var ProgressBar = require('progress');
 
 var writeFile = Promise.denodeify(fs.writeFile);
+var stat = Promise.denodeify(fs.stat);
 
 
 var Commit = models.Commit,
@@ -57,6 +57,26 @@ MarketDriver.prototype.print = function() {
       util.format.apply(null, arguments)
     );
   }
+};
+
+MarketDriver.prototype.loadMailMap = function() {
+  var pattern = /^\s*(\w+\s*)+\s+<[^>]+>$/;
+  return stat(path.join(this.path, ".mailmap")).then(function(stats) {
+    if(stats.isFile()) {
+      return readFile(path);
+    }
+  }).then(function(data) {
+    if(!data) {
+      return;
+    }
+
+    var lines = data.replace('\r', '').split('\n');
+    lines.forEach(function(line) {
+
+    });
+  }).catch(function() {
+
+  });
 };
 
 MarketDriver.prototype.printStatus = function() {
@@ -205,14 +225,17 @@ MarketDriver.prototype.run = function(branch) {
 };
 
 MarketDriver.prototype._writeFirstDay = function() {
-  var dayTrading = this.market.beginDayTrading();
+  var first = this.timeline[0].date;
+  var day0 = moment(first, "YYYYMMDD").subtract(1, 'days').format('YYYYMMDD');
+
+  var dayTrading = this.market.beginDayTrading(day0);
   var data = JSON.stringify({
     day: dayTrading.serialize(),
     lifetime: this.market.serialize()
   }, null, '  ');
 
   //console.log('after merge: %s', path.join(self.dest, day.date + ".json"));
-  return writeFile(path.join(this.dest, "0.json"), data);
+  return writeFile(path.join(this.dest, day0 + ".json"), data);
 };
 
 MarketDriver.prototype._runDay = function(day, branch) {
@@ -242,12 +265,10 @@ MarketDriver.prototype._runDay = function(day, branch) {
 
     //console.log('after merge: %s', path.join(self.dest, day.date + ".json"));
     return writeFile(path.join(self.dest, day.date + ".json"), data);
-  }).then(function(record) {
-    //TODO
-    //console.log("after write");
-
-    // merge the day market results into the lifetime market
-
+  }).then(function() {
+    // var last = day.commits[day.commits.length - 1];
+    // var ts = last.timeMs();
+    // return self.calcAverageLineLifespan(last.sha(), last.timeMs());
   });
 };
 
@@ -423,6 +444,7 @@ MarketDriver.prototype._getFilePaths = function(tree) {
   var treeList = [];
   var self = this;
   var promise;
+  var size = 0;
 
   tree.entries().forEach(function(entry) {
     if(entry.isFile() && self.pathMatches(entry.path())) {
@@ -439,6 +461,7 @@ MarketDriver.prototype._getFilePaths = function(tree) {
       _.zip(blobPaths, blobs).forEach(function(entry) {
         if(!entry[1].isBinary()) {
           paths.push(entry[0]);
+          size += entry[1].rawsize();
         }
       });
 
@@ -498,13 +521,20 @@ MarketDriver.prototype._calcAverageLineLifespanInBlame = function(blame, now) {
   });
 };
 
-MarketDriver.prototype.calcAverageLineLifespan = function(hash) {
+MarketDriver.prototype.calcAverageLineLifespan = function(hash, now) {
   var paths = [];
   var self = this;
   var commit;
-  var now = moment.utc().valueOf();
+  var now = now || moment.utc().valueOf();
 
-  return this.repo.getCommit(hash).then(function(c) {
+  var p1;
+  if(_.isString(hash)) {
+    p1 = this.repo.getCommit(hash);
+  } else {
+    p1 = Promise.resolve(hash);
+  }
+
+  return p1.then(function(c) {
     commit = c;
     return commit.getTree();
   }).then(function(tree) {
@@ -549,6 +579,8 @@ MarketDriver.prototype.calcAverageLineLifespan = function(hash) {
     for(var email in r.stocks) {
       console.log(">>", email, "=>", r.stocks[email], ";", (r.stocks[email] / r.totalLineCount * 100.0).toFixed(2));
     }
+
+    return r;
   });
 };
 
