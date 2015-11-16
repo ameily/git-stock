@@ -21,6 +21,7 @@
   "dependencies": {
     "d3": "~3.5.8",
     "bootstrap": "~3.3.5",
-    "numeral": "~1.5.3"
+    "numeral": "~1.5.3",
+    "moment": "~2.10.6"
   }
 }
