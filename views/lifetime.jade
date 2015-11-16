@@ -4,6 +4,7 @@ block head
   title Lifetime
   script(src='/vendor/d3/d3.js')
   script(src='/vendor/numeral/numeral.js')
+  script(src='/vendor/moment/moment.js')
   
   style.
     path { 
@@ -33,9 +34,14 @@ block content
       hr
   
   div.row
-    div.col-md-4.summary#valueBlock
-    div.col-md-4.summary#commitsBlock
-    div.col-md-4.summary#contribsBlock
+    div.col-md-4#topContribs
+    div.col-md-4#topDvidends
+  
+  div.row
+    div.col-md-3.summary#ageBlock
+    div.col-md-3.summary#valueBlock
+    div.col-md-3.summary#commitsBlock
+    div.col-md-3.summary#contribsBlock
 
 
 block foot
@@ -96,7 +102,7 @@ block foot
       //-   });
       //- }
       valueAxis.tickFormat(function(d) {
-        return numeral(d).format('0,0[.]0a');
+        return numeral(d).format('$0,0[.]0a');
       });
       
       // axis domains
@@ -148,6 +154,7 @@ block foot
     }
     
     function updateLatest(data) {
+      var parseDate = d3.time.format("%Y%m%d").parse;
       var value = data.lifetime.value;
       
       //- if(value > 1000) {
@@ -173,6 +180,22 @@ block foot
       ).append(
         $("<h4>").text("Commits")
       );
+      
+      var firstCommit = d3.min(data.lifetime.stocks, function(d) { return parseDate(d.firstCommitDate); });
+      var ageMs = new Date() - firstCommit;
+      var age = (ageMs / 1000 / 60 / 60 / 24);
+      
+      if(age > 400) {
+        age = (age / 365).toFixed(2) + " years";
+      } else {
+        age = age.toFixed(0) + " days";
+      }
+      
+      $("#ageBlock").append(
+        $("<h2>").text(age)
+      ).append(
+        $("<h4>").text("Repo Age")
+      );
     }
     
     $(document).ready(function() {
@@ -183,4 +206,4 @@ block foot
       d3.json('/api/v1/latest.json', function(err, data) {
         updateLatest(data);
       });
-    }); 
+    });
