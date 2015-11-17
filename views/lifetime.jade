@@ -25,7 +25,7 @@ block head
       text-align: center;
     }
     
-    #topContribs .arc path {
+    .arc path {
       stroke: #fff;
     }
 
@@ -311,7 +311,138 @@ block foot
     }
     
     function drawCommitVsMerge(data) {
+      var margin = 20;
+      var width = $("#commitVsMerge").width();
+      var height = 200;
+      var radius = (height < width ? height : width) / 2;
+      var color = function(d, i) {
+        // 0 == commit, 1 == merge
+        return i == 0 ? "#5bc0de" : "#337ab7";
+      };
       
+      var commitVsMerge = [
+        { label: "Commits", count: data.lifetime.commits },
+        { label: "Merges", count: data.lifetime.merges }
+      ];
+      
+      var arc = d3.svg.arc()
+        .outerRadius(radius)
+        .innerRadius(0);
+      
+      var arcHover = d3.svg.arc()
+        .outerRadius(radius + 10)
+        .innerRadius(0);
+      
+      var pie = d3.layout.pie()
+        .sort(null)
+        .value(function(d) { return d.count; });
+      
+      var svg = d3.select("#commitVsMerge").append("svg")
+        .attr('width', width)
+        .attr('height', height + 20)
+        .append("g")
+          .attr("transform", "translate(" + (width / 2) + ", " + (height / 2 + 10) + ")");
+      
+      var g = svg.selectAll(".arc")
+        .data(pie(commitVsMerge))
+        .enter().append("g")
+          .attr("class", "arc");
+      
+      g.append("path")
+        .attr('d', arc)
+        .style("fill", color);
+      
+    }
+    
+    function drawDividends(data) {
+      var margin = 20;
+      var width = $("#dividends").width();
+      var height = 200;
+      var radius = (height < width ? height : width) / 2;
+      var color = d3.scale.category20b();
+      var totalValue = data.lifetime.value;
+      
+      var dividens = data.lifetime.dividends.sort(function(a, b) {
+        return a.value < b.value ? 1 : (a.value == b.balue ? 0 : -1);
+      });
+      
+      if(dividends.length > 5) {
+        var top4 = 0;
+        
+        for(var i = 0; i < 4; ++i) {
+          top4 += dividens[i].value;
+        }
+        
+        dividens = [
+          dividens[0],
+          dividens[1],
+          dividens[2],
+          dividens[3],
+          {
+            value: totalValue - top4,
+            id: "Other"
+          }
+        ];
+      }
+      
+      var arc = d3.svg.arc()
+        .outerRadius(radius)
+        .innerRadius(0);
+      
+      var arcHover = d3.svg.arc()
+        .outerRadius(radius + 10)
+        .innerRadius(0);
+      
+      var pie = d3.layout.pie()
+        .sort(null)
+        .value(function(d) { return d.value; });
+      
+      var svg = d3.select("#dividends").append("svg")
+        .attr('width', width)
+        .attr('height', height + 20)
+        .append("g")
+          .attr("transform", "translate(" + (width / 2) + ", " + (height / 2 + 10) + ")");
+      
+      var g = svg.selectAll(".arc")
+        .data(pie(dividens))
+        .enter().append("g")
+          .attr("class", "arc");
+      
+      g.append("path")
+        .attr('d', arc)
+        .style("fill", function(d, i) {
+          return color(i); 
+        });
+      
+      $tbody = $("<tbody>");
+      
+      dividens.forEach(function(dividend, i) {
+        $tbody.append(
+          $("<tr>").append(
+            $("<th class='text-left'>").text(dividend.id)
+          ).append(
+            $("<td class='text-right'>").text(numeral(dividend.value).format("$0,0a"))
+          ).append(
+            $("<td class='text-right'>").text(numeral(dividend.value / totalValue).format('0%'))
+          ).css('color', color(i)).hover(function() {
+            $(this).css('background-color', $(this).css('color')).css("color", "#fff");
+            g.filter(function(d, subi) { return i == subi; }).select("path")
+              .transition()
+                .duration(500)
+                .attr('d', arcHover);
+          }, function() {
+            $(this).css("color", $(this).css('background-color')).css('background-color', 'rgba(0, 0, 0, 0)');
+            g.filter(function(d, subi) { return i == subi; }).select("path")
+              .transition()
+              .duration(500)
+              .attr('d', arc);
+          })
+        );
+      });
+      
+      $("#dividends").append(
+        $("<table class='table'>").append($tbody)
+      );
     }
     
     $(document).ready(function() {
@@ -322,5 +453,7 @@ block foot
       d3.json('/api/v1/latest.json', function(err, data) {
         updateLatest(data);
         updateTopContribs(data);
+        drawCommitVsMerge(data);
+        drawDividends(data);
       });
     });
