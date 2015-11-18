@@ -4,12 +4,6 @@ var moment = require('moment');
 
 
 
-function StockRecord(data) {
-  this.totalLineCount = data.totalLineCount || 0;
-  this.totalLineAge = data.totalLineAge || 0;
-  this.avgLineAge = data.avgLineAge || null;
-}
-
 function Commit(data) {
   this.sha = data.sha;
   this.message = data.message;
@@ -91,11 +85,13 @@ function Market(data) {
   this.value = data.value || 0;
   this.dividends = data.dividends || [];
 
-  this.record = null;
+  this.totalLineCount = data.totalLineCount || 0;
+  this.totalLineAge = data.totalLineAge || 0;
+  this.avgLineAge = data.avgLineAge || 0;
 }
 
 Market.prototype.beginDayTrading = function(date) {
-  this.record = null;
+  this.totalLineAge = this.totalLineCount = this.avgLineAge = 0;
 
   return new MarketDayTrading({
     name: this.name,
@@ -133,8 +129,48 @@ Market.prototype.serialize = function() {
     merges: this.merges,
     value: this.value,
     dividends: this.dividends,
-    record: this.record ? this.record.serialize() : null
+    totalLineAge: this.totalLineAge,
+    totalLineCount: this.totalLineCount,
+    avgLineAge: this.avgLineAge
   };
+};
+
+Market.prototype.createRecord = function() {
+  var record = {
+    totalLineAge: 0,
+    totalLineCount: 0,
+    stocks: [],
+    stockLookup: {}
+  };
+
+  this.stocks.forEach(function(stock) {
+    var sr = {
+      totalLineCount: 0,
+      totalLineAge: 0,
+      email: stock.email,
+      name: stock.name
+    };
+
+    record.stocks.push(sr);
+    record.stockLookup[stock.email] = sr;
+  });
+
+  return record;
+};
+
+Market.prototype.mergeRecord = function(record) {
+  var self = this;
+
+  this.totalLineAge = record.totalLineAge;
+  this.totalLineCount = record.totalLineCount;
+  this.avgLineAge = this.totalLineCount > 0 ? this.totalLineAge / this.totalLineCount : 0;
+
+  record.stocks.forEach(function(rhs, i) {
+    var lhs = self.stocks[i];
+    lhs.totalLineAge = rhs.totalLineAge;
+    lhs.totalLineCount = rhs.totalLineCount;
+    lhs.avgLineAge = lhs.totalLineCount > 0 ? lhs.totalLineAge / lhs.totalLineCount : 0;
+  });
 };
 
 exports.Market = Market;
@@ -260,6 +296,10 @@ function Stock(data) {
   this.dividends = data.dividends || [];
 
   this.firstCommitDate = data.firstCommitDate || null;
+
+  this.totalLineCount = data.totalLineCount || 0;
+  this.totalLineAge = data.totalLineAge || 0;
+  this.avgLineAge = data.avgLineAge || 0;
 }
 
 Stock.prototype.mergeDayTrading = function(stock) {
@@ -276,6 +316,8 @@ Stock.prototype.mergeDayTrading = function(stock) {
 };
 
 Stock.prototype.beginDayTrading = function(date) {
+  this.totalLineAge = this.totalLineCount = this.avgLineAge = 0;
+
   return new StockDayTrading({
     date: date,
     name: this.name,
@@ -296,7 +338,10 @@ Stock.prototype.serialize = function() {
     commits: this.commits,
     merges: this.merges,
     dividends: this.dividends,
-    firstCommitDate: this.firstCommitDate
+    firstCommitDate: this.firstCommitDate,
+    totalLineAge: this.totalLineAge,
+    totalLineCount: this.totalLineCount,
+    avgLineAge: this.avgLineAge
   };
 }
 

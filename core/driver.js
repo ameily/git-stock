@@ -178,6 +178,7 @@ MarketDriver.prototype._buildTimeline = function() {
 
   //console.log("=====================================");
   this._timelineBldr = null;
+  this._commitHashes = null;
 };
 
 MarketDriver.prototype.run = function(branch) {
@@ -197,7 +198,13 @@ MarketDriver.prototype.run = function(branch) {
   }).then(function() {
     return self._writeFirstDay();
   }).then(function() {
-    self.print("Done\n")
+    self.print("Done\n");
+
+    // if(true) {
+    //   var day = self.timeline[self.timeline.length - 1];
+    //   var commit = day.commits[day.commits.length - 1];
+    //   return self.calcAverageLineLifespan(commit, commit.timeMs());
+    // }
 
     self.progress = new ProgressBar('Processing [:bar] :percent', {
       total: self.commitCount,
@@ -207,8 +214,10 @@ MarketDriver.prototype.run = function(branch) {
     });
 
     var promise = Promise.resolve(null);
-    self.timeline.forEach(function(day) {
-      promise = promise.then(function() { return self._runDay(day, branch); });
+    self.timeline.forEach(function(day, i) {
+      promise = promise.then(function() {
+        return self._runDay(day, branch);
+      });
     });
 
     /*
@@ -251,12 +260,22 @@ MarketDriver.prototype._runDay = function(day, branch) {
       return self._runCommit(commit, branch, dayTrading);
     })
   ).then(function() {
-    //return self.calcAverageLineLifespan(dayTrading.lastCommit());
+    var last = day.commits[day.commits.length - 1];
 
     // update the day trading based on stock activity
     dayTrading.pollStocks();
 
     self.market.mergeDayTrading(dayTrading);
+
+    if(day.date == self.timeline[self.timeline.length - 1].date) {
+      //console.log("\n>> last day <<");
+      return self.calcAverageLineLifespan(last.sha(), last.timeMs());
+    }
+    return null;
+  }).then(function(record) {
+    if(record) {
+      self.market.mergeRecord(record);
+    }
 
     var data = JSON.stringify({
       day: dayTrading.serialize(),
@@ -265,10 +284,6 @@ MarketDriver.prototype._runDay = function(day, branch) {
 
     //console.log('after merge: %s', path.join(self.dest, day.date + ".json"));
     return writeFile(path.join(self.dest, day.date + ".json"), data);
-  }).then(function() {
-    // var last = day.commits[day.commits.length - 1];
-    // var ts = last.timeMs();
-    // return self.calcAverageLineLifespan(last.sha(), last.timeMs());
   });
 };
 
@@ -444,7 +459,6 @@ MarketDriver.prototype._getFilePaths = function(tree) {
   var treeList = [];
   var self = this;
   var promise;
-  var size = 0;
 
   tree.entries().forEach(function(entry) {
     if(entry.isFile() && self.pathMatches(entry.path())) {
@@ -461,8 +475,9 @@ MarketDriver.prototype._getFilePaths = function(tree) {
       _.zip(blobPaths, blobs).forEach(function(entry) {
         if(!entry[1].isBinary()) {
           paths.push(entry[0]);
-          size += entry[1].rawsize();
         }
+
+        //entry[1].free();
       });
 
       return paths;
@@ -484,17 +499,14 @@ MarketDriver.prototype._getFilePaths = function(tree) {
   return promise;
 };
 
-MarketDriver.prototype._calcAverageLineLifespanInBlame = function(blame, now) {
+MarketDriver.prototype._calcAverageLineLifespanInBlame = function(blame, record, now) {
   var commitList = [];
   var commitLineCount = [];
   var self = this;
-  var totalAge = 0;
-  var totalLineCount = 0;
-  var stocks = {};
 
   for(var i = 0; i < blame.getHunkCount(); ++i) {
     var hunk = blame.getHunkByIndex(i);
-    totalLineCount += hunk.linesInHunk();
+    record.totalLineCount += hunk.linesInHunk();
     commitLineCount.push(hunk.linesInHunk());
     commitList.push(self.repo.getCommit(hunk.finalCommitId()));
   }
@@ -504,20 +516,17 @@ MarketDriver.prototype._calcAverageLineLifespanInBlame = function(blame, now) {
       // entry[0] => line count used from commit
       // entry[1] => commit object
       var email = entry[1].author().email();
-      totalAge += (now - entry[1].timeMs()) * entry[0];
+      var age = (now - entry[1].timeMs()) * entry[0];
+      var stock = record.stockLookup[email];
 
-      if(email in stocks) {
-        stocks[email] += entry[0];
-      } else {
-        stocks[email] = entry[0];
-      }
+      record.totalLineAge += age;
+
+      stock.totalLineCount += entry[0];
+      stock.totalLineAge += age;
+
+      //entry[1].free();
     });
-
-    return {
-      totalAge: totalAge,
-      totalLineCount: totalLineCount,
-      stocks: stocks
-    };
+    //blame.free();
   });
 };
 
@@ -526,6 +535,7 @@ MarketDriver.prototype.calcAverageLineLifespan = function(hash, now) {
   var self = this;
   var commit;
   var now = now || moment.utc().valueOf();
+  var record = this.market.createRecord();
 
   var p1;
   if(_.isString(hash)) {
@@ -543,27 +553,22 @@ MarketDriver.prototype.calcAverageLineLifespan = function(hash, now) {
     return Promise.all(_.map(paths, function(path) {
       var opts = new git.BlameOptions();
       opts.newestCommit = commit.id();
-      console.log(">>", path);
       return git.Blame.file(self.repo, path, opts);
     }));
   }).then(function(blames) {
     return Promise.all(
       _.map(blames, function(blame) {
-        return self._calcAverageLineLifespanInBlame(blame, now);
+        return self._calcAverageLineLifespanInBlame(blame, record, now);
       })
     );
-  }).then(function(results) {
-    var r = {
-      totalAge: 0,
-      totalLineCount: 0,
-      stocks: {}
-    };
-
+  }).then(function() {
+    /*
     results.forEach(function(result) {
-      r.totalAge += result.totalAge;
-      r.totalLineCount += result.totalLineCount;
+      self.market.totalAge += result.totalAge;
+      self.market.totalLineCount += result.totalLineCount;
 
       for(var email in result.stocks) {
+        self.stocks[email].
         if(email in r.stocks) {
           r.stocks[email] += result.stocks[email];
         } else {
@@ -571,16 +576,15 @@ MarketDriver.prototype.calcAverageLineLifespan = function(hash, now) {
         }
       }
     });
+    */
 
-    console.log("total age:", r.totalAge);
-    console.log("total lines:", r.totalLineCount);
-    console.log("Avg Line Age:", (r.totalAge / r.totalLineCount / 1000 / 60 / 60 / 24).toFixed(2), "days");
 
-    for(var email in r.stocks) {
-      console.log(">>", email, "=>", r.stocks[email], ";", (r.stocks[email] / r.totalLineCount * 100.0).toFixed(2));
-    }
+    // var r = record;
+    // console.log("total age:", r.totalLineAge);
+    // console.log("total lines:", r.totalLineCount);
+    // console.log("Avg Line Age:", (r.totalLineAge / r.totalLineCount / 1000 / 60 / 60 / 24).toFixed(2), "days");
 
-    return r;
+    return record;
   });
 };
 
