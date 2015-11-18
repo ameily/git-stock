@@ -64,6 +64,18 @@ block content
 
 block foot
   script.
+    var BOOTSTRAP_COLORS = [
+      '#5cb85c',
+      '#337ab7',
+      '#5bc0de',
+      '#f0ad4e',
+      '#d9534f'
+    ];
+    
+    function bootstrapColor(d, i) {
+      return i < BOOTSTRAP_COLORS.length ? BOOTSTRAP_COLORS[i] : "#ccc";
+    }
+    
     function drawLifetime(data) {
       var margin = {
         top: 20,
@@ -445,6 +457,53 @@ block foot
       );
     }
     
+    function drawAvgLoCAge(data) {
+      if(data.lifetime.avgLineAge == 0) {
+        return;
+      }
+      
+      var parseDate = d3.time.format("%Y%m%d").parse;
+      
+      var firstCommit = d3.min(data.lifetime.stocks, function(d) { return parseDate(d.firstCommitDate); });
+      var ageMs = new Date() - firstCommit;
+      var color = function(d, i) {
+        return i == 0 ? BOOTSTRAP_COLORS[0] : "#ccc";
+      }
+      
+      var margin = 20;
+      var width = $("#codeAge").width();
+      var height = 200;
+      var radius = (height < width ? height : width) / 2;
+      
+      
+      var arc = d3.svg.arc()
+        .outerRadius(radius)
+        .innerRadius(0);
+      
+      var arcHover = d3.svg.arc()
+        .outerRadius(radius + 10)
+        .innerRadius(0);
+      
+      var pie = d3.layout.pie()
+        .sort(null)
+        .value(function(d) { return d; });
+      
+      var svg = d3.select("#codeAge").append("svg")
+        .attr('width', width)
+        .attr('height', height + 20)
+        .append("g")
+          .attr("transform", "translate(" + (width / 2) + ", " + (height / 2 + 10) + ")");
+      
+      var g = svg.selectAll(".arc")
+        .data(pie([data.lifetime.avgLineAge, ageMs - data.lifetime.avgLineAge]))
+        .enter().append("g")
+          .attr("class", "arc");
+      
+      g.append("path")
+        .attr('d', arc)
+        .style("fill", color);
+    }
+    
     $(document).ready(function() {
       d3.json('/api/v1/lifetime.json', function(err, data) {
         drawLifetime(data);
@@ -455,5 +514,6 @@ block foot
         updateTopContribs(data);
         drawCommitVsMerge(data);
         drawDividends(data);
+        drawAvgLoCAge(data);
       });
     });
