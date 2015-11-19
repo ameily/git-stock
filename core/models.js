@@ -76,6 +76,8 @@ exports.Commit = Commit;
  ****************************************************************************/
 
 function Market(data) {
+  var self = this;
+
   this.name = data.name || null;
   this.stocks = data.stocks || [];
   this.additions = data.additions || 0;
@@ -88,6 +90,11 @@ function Market(data) {
   this.totalLineCount = data.totalLineCount || 0;
   this.totalLineAge = data.totalLineAge || 0;
   this.avgLineAge = data.avgLineAge || 0;
+
+  this.stockLookup = {};
+  this.stocks.forEach(function(stock) {
+    self.stockLookup[stock.email] = stock;
+  });
 }
 
 Market.prototype.beginDayTrading = function(date) {
@@ -118,6 +125,20 @@ Market.prototype.mergeDayTrading = function(dt) {
 
   mergeDividends(this.dividends, dt.dividends);
 };
+
+Market.prototype.getStock = function(email, name) {
+  var stock = this.stockLookup[email];
+  if(_.isUndefined(stock)) {
+    stock = this.stockLookup[email] = new Stock({
+      email: email,
+      name: name
+    });
+
+    this.stocks.push(stock);
+  }
+
+  return stock;
+}
 
 Market.prototype.serialize = function() {
   return {

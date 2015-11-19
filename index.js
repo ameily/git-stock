@@ -69,10 +69,11 @@ var config = new GitStockConfig();
 config.register(Plugins);
 
 var driver = new MarketDriver({
+  name: path.basename(options.input),
   path: options.input,
+  db: options.output,
   config: config,
   plugins: Plugins,
-  dest: options.output,
   silent: options.silent || false
 });
 

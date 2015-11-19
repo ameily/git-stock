@@ -12,6 +12,7 @@ var fs = require('fs');
 var cursor = ansi(process.stdout);
 var models = require('./models');
 var ProgressBar = require('progress');
+var slug = require('slug');
 
 var writeFile = Promise.denodeify(fs.writeFile);
 var stat = Promise.denodeify(fs.stat);
@@ -29,27 +30,19 @@ function getDayKey(timeMs) {
 
 function MarketDriver(options) {
   this.path = options.path;
+  this.name = options.name;
+  this.id = options.id || slug(this.name, {lower: true});
+  this.db = path.join(options.db, this.id);
+
+  this.mailmap = options.mailmap || {};
+  this.milestones = options.milestones || [];
+  this.milestoneLookup = {};
+  this.ignore = options.ignore || [];
   this.config = options.config;
   this.plugins = options.plugins;
-  this.dest = options.dest;
-  this.silent = options.silent || false;
-  this.ignore = options.ignore || [];
   this.repo = null;
-
-  this.timeline = [];
-
-  this.stocks = [];
-  this.stockLookup = {};
-  this._timelineBldr = {};
-  this._commitHashes = {};
-  this.commitCount = 0;
-  this.progress = null;
-
-  this.market = new Market({
-    name: path.basename(this.path),
-    stocks: this.stocks
-  });
 }
+
 
 MarketDriver.prototype.print = function() {
   if(!this.silent) {
@@ -59,25 +52,6 @@ MarketDriver.prototype.print = function() {
   }
 };
 
-MarketDriver.prototype.loadMailMap = function() {
-  var pattern = /^\s*(\w+\s*)+\s+<[^>]+>$/;
-  return stat(path.join(this.path, ".mailmap")).then(function(stats) {
-    if(stats.isFile()) {
-      return readFile(path);
-    }
-  }).then(function(data) {
-    if(!data) {
-      return;
-    }
-
-    var lines = data.replace('\r', '').split('\n');
-    lines.forEach(function(line) {
-
-    });
-  }).catch(function() {
-
-  });
-};
 
 MarketDriver.prototype.printStatus = function() {
   if(!this.silent) {
@@ -104,10 +78,32 @@ MarketDriver.prototype.init = function() {
   var self = this;
   return git.Repository.open(this.path).then(function(repo) {
     self.repo = repo;
+    self.milestones.forEach(function(milestone) {
+      self.milestoneLookup[milestone.date] = milestone;
+    });
+
+    self.market = new Market({
+      name: self.name
+    });
+
+    try {
+      var stats = fs.statSync(self.db);
+      if(!stats.isDirectory()) {
+        throw new Error("path is not a directory: " + options.input);
+      }
+    } catch(err) {
+      try {
+        fs.mkdirSync(self.db);
+      } catch(err2) {
+        console.error('failed to create output directory: %s', err2);
+        throw err2;
+      }
+    }
+
     return self;
   });
 };
-
+/*
 MarketDriver.prototype.getStock = function(email, name) {
   var stock = this.stockLookup[email];
   if(_.isUndefined(stock)) {
@@ -121,27 +117,49 @@ MarketDriver.prototype.getStock = function(email, name) {
 
   return stock;
 };
+*/
 
-MarketDriver.prototype.addCommit = function(commit) {
-  if(commit.sha() in this._commitHashes) {
+MarketDriver.prototype.resolveAuthor = function(email, name) {
+  var entry = this.mailmap[email];
+  if(!entry) {
+    return {
+      email: email,
+      name: name
+    };
+  }
+
+  if(_.isString(entry)) {
+    return {
+      email: entry,
+      name: name
+    };
+  }
+
+  return entry;
+}
+
+MarketDriver.prototype._addCommit = function(commit, cache, calendar) {
+  if(commit.sha() in cache) {
     return;
   } else {
-    this._commitHashes[commit.sha()] = true;
-    this.commitCount += 1;
+    cache[commit.sha()] = true;
+    cache.__count += 1;
   }
 
   var self = this;
 
-  var stock = this.getStock(commit.author().email(), commit.author().name());
+  var author = this.resolveAuthor(commit.author().email(), commit.author().name());
+
+  var stock = this.market.getStock(author.email, author.name);
   var date = getDayKey(commit.timeMs());
-  var day = this._timelineBldr[date];
+  var day = calendar[date];
 
   if(!stock.firstCommitDate || stock.firstCommitDate > date) {
     stock.firstCommitDate = date;
   }
 
   if(_.isUndefined(day)) {
-    this._timelineBldr[date] = {
+    calendar[date] = {
       date: date,
       commits: [commit]
     };
@@ -151,54 +169,59 @@ MarketDriver.prototype.addCommit = function(commit) {
 
   return commit.getParents().then(function(parents) {
     return Promise.all(
-      _.map(parents, function(p) { return self.addCommit(p); })
+      _.map(parents, function(p) { return self._addCommit(p, cache, calendar); })
     );
   });
 }
 
-MarketDriver.prototype._buildTimeline = function() {
+MarketDriver.prototype._buildTimeline = function(calendar) {
   var self = this;
-  var days = _.keys(this._timelineBldr).sort();
+  var days = _.keys(calendar).sort();
+  var timeline = [];
+  var day0 = moment(days[0], "YYYYMMDD").subtract(1, 'days').format('YYYYMMDD');
+
+  timeline.push({
+    date: day0,
+    commits: []
+  });
 
   days.forEach(function(date) {
     // console.log("Date:", date);
-    var commits = self._timelineBldr[date].commits.sort(function(a,b) {
+    var commits = calendar[date].commits.sort(function(a,b) {
       return a.timeMs() < b.timeMs() ? -1 : 1;
     });
 
-    // commits.forEach(function(c) {
-    //   console.log(">>", c.timeMs());
-    // });
-
-    self.timeline.push({
+    timeline.push({
       date: date,
       commits: commits
     });
   });
 
-  //console.log("=====================================");
-  this._timelineBldr = null;
-  this._commitHashes = null;
+  return timeline;
 };
 
 MarketDriver.prototype.run = function(branch) {
   var self = this;
+  var cache = {
+    __count: 0
+  };
+  var calendar = { };
+
   branch = branch || "master";
 
   this.print("Getting HEAD...          ");
   return this.repo.getBranchCommit(branch).then(function(commit) {
     self.print(commit.sha() + "\n");
     self.print("Loading commits...       ");
-    return self.addCommit(commit);
+    return self._addCommit(commit, cache, calendar);
   }).then(function() {
-    self.print(self.commitCount.toString() + "\n");
+    self.print(cache.__count.toString() + "\n");
 
     self.print("Building timeline...     ");
-    return self._buildTimeline();
-  }).then(function() {
-    return self._writeFirstDay();
-  }).then(function() {
-    self.print("Done\n");
+    return self._buildTimeline(calendar);
+  }).then(function(timeline) {
+    self.print(timeline.length + " Days\n");
+    var lastIndex = timeline.length - 1;
 
     // if(true) {
     //   var day = self.timeline[self.timeline.length - 1];
@@ -206,91 +229,81 @@ MarketDriver.prototype.run = function(branch) {
     //   return self.calcAverageLineLifespan(commit, commit.timeMs());
     // }
 
-    self.progress = new ProgressBar('Processing [:bar] :percent', {
-      total: self.commitCount,
+    var progress = new ProgressBar('Processing [:bar] :percent', {
+      total: cache.__count,
       complete: '=',
       incomplete: ' ',
       width: 50
     });
 
     var promise = Promise.resolve(null);
-    self.timeline.forEach(function(day, i) {
+    timeline.forEach(function(day, i) {
       promise = promise.then(function() {
-        return self._runDay(day, branch);
+        return self._runDay(day, branch, progress);
+      }).then(function(dayTrading) {
+        if(lastIndex == i) {
+          // We just completed running the last day. Perform blame analysis to
+          // determine file ownership and code age.
+          var commit = day.commits[day.commits.length - 1];
+          self.print("Calculating code age...  ");
+          return self.calcAverageLineLifespan(commit, commit.timeMs()).then(function(record) {
+            self.print("Done\n");
+            self.market.mergeRecord(record);
+            return self._writeDay(dayTrading);
+          });
+        } else {
+          return self._writeDay(dayTrading);
+        }
       });
     });
 
-    /*
-    return Promise.all(
-      _.map(self.timeline, function(day) {
-        return self._runDay(day, branch);
-      })
-    );
-    */
     return promise;
   }).then(function() {
     self.print("\nDone\n");
   });
 };
 
-MarketDriver.prototype._writeFirstDay = function() {
-  var first = this.timeline[0].date;
-  var day0 = moment(first, "YYYYMMDD").subtract(1, 'days').format('YYYYMMDD');
-
-  var dayTrading = this.market.beginDayTrading(day0);
+MarketDriver.prototype._writeDay = function(dayTrading) {
   var data = JSON.stringify({
     day: dayTrading.serialize(),
     lifetime: this.market.serialize()
   }, null, '  ');
 
   //console.log('after merge: %s', path.join(self.dest, day.date + ".json"));
-  return writeFile(path.join(this.dest, day0 + ".json"), data);
+  return writeFile(path.join(this.db, dayTrading.date + ".json"), data);
 };
 
-MarketDriver.prototype._runDay = function(day, branch) {
+
+MarketDriver.prototype._runDay = function(day, branch, progress) {
   //console.log("Day:", day.date);
   var self = this;
-  // console.log("Processing day: %s", day.date);
+  //console.log("Processing day: %s", day.date);
 
   // Make the day market
   var dayTrading = this.market.beginDayTrading(day.date);
+  //console.log("Day:", day);
 
   return Promise.all(
     _.map(day.commits, function(commit) {
-      return self._runCommit(commit, branch, dayTrading);
+      return self._runCommit(commit, branch, dayTrading).then(function() {
+        progress.tick();
+      });
     })
   ).then(function() {
-    var last = day.commits[day.commits.length - 1];
-
     // update the day trading based on stock activity
     dayTrading.pollStocks();
 
     self.market.mergeDayTrading(dayTrading);
-
-    if(day.date == self.timeline[self.timeline.length - 1].date) {
-      //console.log("\n>> last day <<");
-      return self.calcAverageLineLifespan(last.sha(), last.timeMs());
-    }
-    return null;
-  }).then(function(record) {
-    if(record) {
-      self.market.mergeRecord(record);
-    }
-
-    var data = JSON.stringify({
-      day: dayTrading.serialize(),
-      lifetime: self.market.serialize()
-    }, null, '  ');
-
-    //console.log('after merge: %s', path.join(self.dest, day.date + ".json"));
-    return writeFile(path.join(self.dest, day.date + ".json"), data);
+    return dayTrading;
   });
 };
 
 MarketDriver.prototype._runCommit = function(commit, branch, dayTrading) {
   //console.log("Commit:", commit.sha());
   var self = this;
-  var stock = dayTrading.getStock(commit.author().email());
+  var email = this.resolveAuthor(commit.author().email(), "").email;
+  var stock = dayTrading.getStock(email);
+  //console.log("stock:", stock);
 
   var pipeline = new PluginPipeline({
     branch: branch,
@@ -324,7 +337,7 @@ MarketDriver.prototype._runCommit = function(commit, branch, dayTrading) {
 
         // stock.pollCommit();
 
-        self.progress.tick();
+        //self.progress.tick();
         pipeline.data.updateStock();
 
         resolve();
@@ -343,115 +356,6 @@ MarketDriver.prototype._runCommit = function(commit, branch, dayTrading) {
   });
 };
 
-MarketDriver.prototype._handleCommit = function(commit, dayTrading) {
-  var self = this;
-  var obj = {
-    market: dayTrading,
-    hash: commit.sha(),
-    commit: commit,
-    stock: this.getStock(commit.author().email()),
-    branch: branch
-  };
-
-  cursor
-    .horizontalAbsolute(0)
-    .eraseLine()
-    .write("Commit: " + this.commits.toString());
-    //.write("Processing Commit: " + commit.sha());
-
-
-  return commit.getDiff().then(function(diffList) {
-    obj.diffList = diffList;
-    var children = _.map(diffList, function(diff) {
-      return diff.findSimilar({
-        flags: git.Diff.FIND.RENAMES |
-               git.Diff.IGNORE_WHITESPACE |
-               git.Diff.REMOVE_UNMODIFIED
-      });
-    });
-
-    return Promise.all(children);
-  }).then(function() {
-    var promise = new Promise(function(resolve, reject) {
-      pipe.on('end', function() {
-        //self.commits += 1;
-        resolve();
-      }).on('error', function(err) {
-        console.log("rejected");
-        console.trace(err);
-        reject(err);
-      }).next();
-    });
-
-    return promise;
-  }).catch(function(error) {
-    console.log();
-    console.log("handleSingle error: ", error); // TODO
-    throw error;
-  });
-};
-
-MarketDriver.prototype.handleSingle = function(hash, branch, processParents) {
-  var self = this;
-  var obj = {
-    hash: hash,
-    branch: branch
-  };
-
-  return this.repo.getCommit(hash).then(function(commit) {
-    return self._handleCommit(commit, branch, processParents);
-  });
-};
-
-MarketDriver.prototype.walk = function(branch) {
-  var self = this;
-  var history = {};
-
-  return this.repo.getBranchCommit(branch).then(function(commit) {
-    return self._handleCommit(commit, branch, true);
-  }).then(function() {
-    console.log();
-    console.log("Done");
-  });
-};
-
-MarketDriver.prototype.handleRange = function(begin, end, branch) {
-  var self = this;
-  var walker = this.repo.createRevWalk();
-  walker.pushRange(begin + ".." + end);
-  var range = [];
-
-  function revFoundCallback(oid) {
-    if(!oid) {
-      return;
-    }
-
-    return self.handleSingle(oid, branch).then(function() {
-      return walker.next().then(revFoundCallback);
-    });
-  }
-
-  return walker.next().then(revFoundCallback).then(function() {
-    return self.handleSingle(begin, branch);
-  });
-};
-
-MarketDriver.prototype.makePipeline = function(obj) {
-  var self = this;
-
-  var promise = new Promise(function(resolve, reject) {
-    pipe.on('end', function() {
-      //self.commits += 1;
-      resolve();
-    }).on('error', function(err) {
-      console.log("rejected");
-      console.trace(err);
-      reject(err);
-    }).next();
-  });
-
-  return promise;
-};
 
 MarketDriver.prototype._getFilePaths = function(tree) {
   var blobPaths = [];
