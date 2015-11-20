@@ -12,7 +12,7 @@ router.get('/:id/lifetime.json', function(req, res, next) {
   });
 });
 
-router.get('/latest.json', function(req, res, next) {
+router.get('/:id/latest.json', function(req, res, next) {
   var driver = Economy.getMarket(req.params.id);
   driver.getLatestDay().then(function(data) {
     res.json(data);

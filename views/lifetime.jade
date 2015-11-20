@@ -3,9 +3,10 @@ extends layout
 block head
   title Lifetime
   script(src='/vendor/d3/d3.js')
+  script(src='/vendor/d3-tip/index.js')
   script(src='/vendor/numeral/numeral.js')
   script(src='/vendor/moment/moment.js')
-  
+  link(rel='stylesheet', href='/css/d3-tip.css', type='text/css')
   style.
     path { 
       stroke: steelblue;
@@ -65,6 +66,7 @@ block content
 block foot
   script(src="/js/graphs/value-over-time.js")
   script.
+    var MARKET_ID = "#{id}";
     var BOOTSTRAP_COLORS = [
       '#5cb85c',
       '#337ab7',
@@ -406,11 +408,11 @@ block foot
     }
     
     $(document).ready(function() {
-      d3.json('/api/v1/lifetime.json', function(err, data) {
+      d3.json('/api/v1/#{id}/lifetime.json', function(err, data) {
         drawLifetime(data);
       });
       
-      d3.json('/api/v1/latest.json', function(err, data) {
+      d3.json('/api/v1/#{id}/latest.json', function(err, data) {
         updateLatest(data);
         updateTopContribs(data);
         drawCommitVsMerge(data);
