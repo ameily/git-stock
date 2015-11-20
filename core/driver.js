@@ -16,6 +16,7 @@ var slug = require('slug');
 
 var writeFile = Promise.denodeify(fs.writeFile);
 var stat = Promise.denodeify(fs.stat);
+var readdir = Promise.denodeify(fs.readdir);
 
 
 var Commit = models.Commit,
@@ -23,23 +24,26 @@ var Commit = models.Commit,
     Stock  = models.Stock;
 
 
+var DB = path.resolve(__dirname, "../", "db");
+
+
 function getDayKey(timeMs) {
   return moment(timeMs).local().format("YYYYMMDD");
 }
 
 
-function MarketDriver(options) {
+function MarketDriver(options, plugins) {
   this.path = options.path;
   this.name = options.name;
   this.id = options.id || slug(this.name, {lower: true});
-  this.db = path.join(options.db, this.id);
+  this.db = options.db || path.join(DB, this.id);
 
   this.mailmap = options.mailmap || {};
   this.milestones = options.milestones || [];
   this.milestoneLookup = {};
   this.ignore = options.ignore || [];
   this.config = options.config;
-  this.plugins = options.plugins;
+  this.plugins = options.plugins || plugins || [];
   this.repo = null;
 }
 
@@ -492,5 +496,51 @@ MarketDriver.prototype.calcAverageLineLifespan = function(hash, now) {
   });
 };
 
+MarketDriver.prototype.getLifetimeData = function() {
+  var self = this;
+
+  return readdir(this.db).then(function(files) {
+    var promises = [];
+    var days = _.filter(files, function(file) {
+      return file.indexOf(".json", file.length - 5) > 0;
+    }).map(function(file) {
+      var entry = {
+        day: file.substring(0, file.length - 5),
+        path: path.join(self.db, file)
+      };
+
+      promises.push(readFile(entry.path).then(function(data) {
+        entry.data = JSON.parse(data);
+        return entry;
+      }));
+    });
+
+    return Promise.all(promises);
+  }).then(function(days) {
+    var data = days.map(function(day) {
+      return {
+        date: day.data.day.date,
+        value: day.data.lifetime.value,
+        commits: day.data.lifetime.commits,
+        milestone: self.milestoneLookup[day.data.day.date]
+      };
+    });
+    return data;
+  }).catch(function(err) {
+    console.trace(err);
+  });
+};
+
+MarketDriver.prototype.getLatestDay = function() {
+  var self = this;
+  return readdir(this.db).then(function(files) {
+    var latest = files.sort()[files.length - 1];
+    return readFile(path.join(self.db, latest));
+  }).then(function(day) {
+    return JSON.parse(day);
+  }).catch(function(err) {
+    console.trace(err);
+  });
+};
 
 module.exports = MarketDriver;
