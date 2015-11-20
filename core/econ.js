@@ -71,12 +71,16 @@ Economy.prototype.bootstrap = function() {
   this.plugins = require('./plugins');
 
   return loadYaml(path.join(CONF_DIR, "git-stock.yaml")).then(function(config) {
-    console.log("done");
     config.markets.forEach(function(marketConfig) {
-      self.markets.push(new MarketDriver(marketConfig), self.plugins);
+      self.markets.push(new MarketDriver(marketConfig, self.plugins));
     });
 
-    return Promise.all(_.map(self.markets), function(m) { return m.init(); });
+    // initialize all the markets
+    return Promise.all(
+      _.map(self.markets, function(m) {
+        return m.init();
+      })
+    );
   });
 };
 
