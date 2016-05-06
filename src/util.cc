@@ -1,6 +1,7 @@
 
 #include "util.hh"
 #include <sstream>
+#include <iomanip>
 
 
 using namespace std;
@@ -51,6 +52,12 @@ string formatDuration(mpz_class duration) {
         ss << duration << "s";
     }
 
+    return ss.str();
+}
+
+string formatPercent(double value) {
+    stringstream ss;
+    ss << fixed << setprecision(2) << (value * 100.0) << "%";
     return ss.str();
 }
 

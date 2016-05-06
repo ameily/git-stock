@@ -10,6 +10,7 @@
 namespace gitstock {
 
 std::string formatDuration(mpz_class duration);
+std::string formatPercent(double value);
 
 template<typename T>
 class RunningMetrics {
