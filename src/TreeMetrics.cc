@@ -2,6 +2,7 @@
 #include "TreeMetrics.hh"
 #include "FileMetrics.hh"
 #include "LineAgeMetrics.hh"
+#include "Stock.hh"
 #include "util.hh"
 #include "Options.hh"
 #include <string>
@@ -27,15 +28,21 @@ public:
     int fileCount;
     vector<FileMetrics*> files;
     LineAgeMetrics lineMetrics;
+    StockCollection stocks;
+    string name;
+    string path;
     
 
-    TreeMetricsImpl(const git_tree *tree, const git_commit *newestCommit)
-        : fileCount(0) {
+    TreeMetricsImpl(const string& path, const git_tree *tree, const git_commit *newestCommit)
+        : fileCount(0), path(path) {
 			
         TreeWalkState state;
+        git_repository *repo = git_tree_owner(tree);
         state.tree = tree;
         state.newestCommit = newestCommit;
         state.pImpl = this;
+
+        name = basename(path.c_str());
 
         git_tree_walk(tree, GIT_TREEWALK_PRE, treeMetricsCallback, &state);
     }
@@ -44,11 +51,13 @@ public:
         ++fileCount;
         files.push_back(metrics);
         lineMetrics.update(metrics->lineMetrics());
+        
+        stocks.update(metrics->stocks());
     }
 };
 
-TreeMetrics::TreeMetrics(const git_tree *tree, const git_commit *newestCommit)
-    : pImpl(new TreeMetricsImpl(tree, newestCommit)) {
+TreeMetrics::TreeMetrics(const string& path, const git_tree *tree, const git_commit *newestCommit)
+    : pImpl(new TreeMetricsImpl(path, tree, newestCommit)) {
 
 }
 
@@ -70,6 +79,10 @@ vector<FileMetrics*>::const_iterator TreeMetrics::begin() const {
 
 vector<FileMetrics*>::const_iterator TreeMetrics::end() const {
 	return pImpl->files.end();
+}
+
+const StockCollection& TreeMetrics::stocks() const {
+    return pImpl->stocks;
 }
 
 
@@ -98,7 +111,7 @@ int treeMetricsCallback(const char *root, const git_tree_entry *entry, void *pay
         if(!opts.shouldIgnorePath(path) && isTextBlob(git_tree_owner(state->tree), entry)) {
 			FileMetrics *metrics = new FileMetrics(state->tree, path, state->newestCommit);
 			state->pImpl->update(metrics);
-			
+			/*
 			cout << path << "\n"
 				<< "  Count:   " << metrics->lineMetrics().count() << "\n"
 				<< "  Sum:     " << metrics->lineMetrics().sum() << "\n"
@@ -117,13 +130,21 @@ int treeMetricsCallback(const char *root, const git_tree_entry *entry, void *pay
 				<< "  Mean_2:  " << metrics->lineMetrics().localMean() << "\n"
 				<< "           " << formatDuration(metrics->lineMetrics().localMean()) << "\n"
 				<< "  StdDev:  " << formatDuration(metrics->lineMetrics().localStandardDeviation()) << "\n\n";
-				
+				*/
 			//cout << path << ": " << formatDuration(metrics->lineMetrics().localMean())
 			//	<< " -> " << formatDuration(metrics->lineMetrics().localStandardDeviation()) << "\n";
 		}
     }
 
     return 0;
+}
+
+const string& TreeMetrics::path() const {
+    return pImpl->path;
+}
+
+const string& TreeMetrics::name() const {
+    return pImpl->name;
 }
 
 }

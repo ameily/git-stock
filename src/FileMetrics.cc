@@ -2,6 +2,7 @@
 #include "FileMetrics.hh"
 #include "util.hh"
 #include "LineAgeMetrics.hh"
+#include "Stock.hh"
 #include <ctime>
 
 using namespace std;
@@ -13,7 +14,7 @@ class FileMetricsImpl {
 public:
 	string path;
     LineAgeMetrics lineMetrics;
-    
+    StockCollection stocks;
 
     FileMetricsImpl(const git_tree *tree, const string& path,
 				    const git_commit *newestCommit) : path(path) {
@@ -42,11 +43,17 @@ public:
 
     void addHunk(git_repository *repo, const git_blame_hunk *hunk) {
         git_commit *commit;
+        const git_signature *sig;
         time_t now = time(nullptr);
 
         git_commit_lookup(&commit, repo, &hunk->final_commit_id);
+        sig = git_commit_committer(commit);
 
 		lineMetrics.update(git_commit_time(commit), hunk->lines_in_hunk);
+        
+        if(sig) {
+            stocks.find(sig).lineMetrics().update(git_commit_time(commit), hunk->lines_in_hunk);
+        }
 
         git_commit_free(commit);
     }
@@ -68,6 +75,10 @@ const string& FileMetrics::path() const {
 
 const LineAgeMetrics& FileMetrics::lineMetrics() const {
 	return pImpl->lineMetrics;
+}
+
+const StockCollection& FileMetrics::stocks() const {
+    return pImpl->stocks;
 }
 
 }

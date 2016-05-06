@@ -10,6 +10,7 @@ namespace gitstock {
 
 class LineAgeMetrics;
 class FileMetricsImpl;
+class StockCollection;
 
 class FileMetrics {
 public:
@@ -20,6 +21,8 @@ public:
 	const std::string& path() const;
 	
     const LineAgeMetrics& lineMetrics() const;
+    
+    const StockCollection& stocks() const;
 
 private:
     FileMetricsImpl *pImpl;
