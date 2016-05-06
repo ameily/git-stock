@@ -9,7 +9,9 @@ add_executable(git-stock
 	src/FileMetrics.cc
 	src/TreeMetrics.cc
 	src/util.cc
+    src/Stock.cc
 	src/Options.cc
+    src/PlainTextReport.cc
 )
 
 
