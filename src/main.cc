@@ -3,8 +3,10 @@
 #include "TreeMetrics.hh"
 #include "util.hh"
 #include "LineAgeMetrics.hh"
+#include "PlainTextReport.hh"
 #include "Options.hh"
 #include <git2.h>
+#include <limits.h>
 #include <getopt.h>
 
 using namespace std;
@@ -41,7 +43,7 @@ int parseArgs(int argc, char **argv, bool& shouldExit) {
     shouldExit = false;
     
     while(1) {
-		c = getopt_long(argc, argv, "hvC:",
+		c = getopt_long(argc, argv, "hvC:n",
                         long_options, &option_index);
         if(c == -1) {
 			break;
@@ -105,6 +107,20 @@ git_commit* resolveRef(git_repository *repo, const string& refName) {
     return commit;
 }
 
+string resolveRepoPath(const string& path) {
+    char buff[PATH_MAX];
+    string resolved;
+    
+    realpath(path.c_str(), buff);
+    
+    resolved = buff;
+    
+    if(resolved.find("/.git", resolved.length() - 5) != string::npos) {
+        resolved = path.substr(0, resolved.length() - 5);
+    }
+    
+    return resolved;
+}
 
 
 int main(int argc, char **argv) {
@@ -113,6 +129,7 @@ int main(int argc, char **argv) {
     git_tree *tree;
     git_commit *commit;
     TreeMetrics *metrics = nullptr;
+    PlainTextReport report;
     GitStockOptions& opts = GitStockOptions::get();
     bool shouldExit;
 
@@ -126,6 +143,8 @@ int main(int argc, char **argv) {
         cerr << "failed to open repo: " << rc << "\n";
         return rc;
     }
+    
+    opts.repoPath = resolveRepoPath(git_repository_path(repo));
 
 	commit = resolveRef(repo, opts.refName);
 
@@ -134,13 +153,12 @@ int main(int argc, char **argv) {
         return rc;
     }
     
-    metrics = new TreeMetrics(tree);
-    cout << "=======================\n"
-		<< "lines:                         " << metrics->lineMetrics().count() << "\n"
-		<< "files:                         " << metrics->fileCount() << "\n"
-		<< "oldest commit;                 " << formatDuration(metrics->lineMetrics().lastCommitTimestamp() - metrics->lineMetrics().firstCommitTimestamp()) << "\n"
-		<< "average line age:              " << formatDuration(metrics->lineMetrics().localMean()) << "\n"
-		<< "line age standard deviation:   " << formatDuration(metrics->lineMetrics().localStandardDeviation()) << "\n";
+    if(opts.useMailMapFile) {
+        opts.loadMailMap(opts.repoPath + "/.mailmap");
+    }
+    
+    metrics = new TreeMetrics(opts.repoPath, tree);
+    report.report(cout, *metrics);
 	
 	delete metrics;
 	return 0;
