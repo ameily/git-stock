@@ -1,6 +1,5 @@
 
 #include "Stock.hh"
-#include "LineAgeMetrics.hh"
 #include "Options.hh"
 
 using namespace std;
@@ -11,7 +10,7 @@ namespace {
 
 struct StockPtrSorter {
     bool operator() (Stock *i, Stock *j) {
-      return i->lineMetrics().count() > j->lineMetrics().count();
+      return i->lineCount() > j->lineCount();
     }
 };
 
@@ -21,22 +20,22 @@ class StockImpl {
 public:
     string email;
     string name;
-    LineAgeMetrics lineMetrics;
-    
+
     StockImpl(const git_signature *sig)
         : email(sig->email), name(sig->name) {
     }
-    
+
     StockImpl(const string& email, const string& name)
         : email(email), name(name) {
     }
 };
 
-Stock::Stock(const git_signature *sig) : pImpl(new StockImpl(sig)) {
+Stock::Stock(const git_signature *sig)
+    : LineAgeMetrics(), pImpl(new StockImpl(sig)) {
 }
 
 Stock::Stock(const string& email, const string& name)
-    : pImpl(new StockImpl(email, name)) {
+    : LineAgeMetrics(), pImpl(new StockImpl(email, name)) {
 }
 
 Stock::~Stock() {
@@ -56,15 +55,7 @@ string Stock::toString() const {
 }
 
 void Stock::update(const Stock& other) {
-    pImpl->lineMetrics.update(other.pImpl->lineMetrics);
-}
-
-LineAgeMetrics& Stock::lineMetrics() {
-    return pImpl->lineMetrics;
-}
-
-const LineAgeMetrics& Stock::lineMetrics() const {
-    return pImpl->lineMetrics;
+    updateLineAgeMetrics(other);
 }
 
 ostream& operator<<(ostream& os, const Stock& stock) {
@@ -76,7 +67,7 @@ ostream& operator<<(ostream& os, const Stock& stock) {
 class StockCollectionImpl {
 public:
     vector<Stock*> collection;
-    
+
     Stock& find(const string& email, const string& name) {
         Stock *stock = nullptr;
         pair<string, string> resolved = GitStockOptions::get().resolveSignature(email, name);
@@ -86,27 +77,27 @@ public:
                 stock = *i;
             }
         }
-        
+
         if(!stock) {
             stock = new Stock(resolved.first, resolved.second);
             collection.push_back(stock);
         }
-        
+
         return *stock;
     }
-    
+
     ~StockCollectionImpl() {
         for(Stock *stock : collection) {
             delete stock;
         }
     }
-    
+
     void update(const StockCollectionImpl& other) {
         for(Stock *stock : other.collection) {
             find(stock->email(), stock->name()).update(*stock);
         }
     }
-    
+
     void sort() {
         std::sort(collection.begin(), collection.end(), StockPtrSorter());
     }

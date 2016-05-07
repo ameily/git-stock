@@ -1,8 +1,8 @@
 
 #include "FileMetrics.hh"
 #include "util.hh"
-#include "LineAgeMetrics.hh"
 #include "Stock.hh"
+#include <git2/blame.h>
 #include <ctime>
 
 using namespace std;
@@ -13,12 +13,13 @@ namespace gitstock {
 class FileMetricsImpl {
 public:
 	string path;
-    LineAgeMetrics lineMetrics;
+    LineAgeMetrics& lineMetrics;
     StockCollection stocks;
 
-    FileMetricsImpl(const git_tree *tree, const string& path,
-				    const git_commit *newestCommit) : path(path) {
-			
+    FileMetricsImpl(LineAgeMetrics& lineMetrics, const git_tree *tree, const string& path,
+				    const git_commit *newestCommit)
+		: lineMetrics(lineMetrics), path(path) {
+
         git_repository *repo = git_tree_owner(tree);
         git_blame *blame;
         git_commit *commit;
@@ -26,7 +27,7 @@ public:
         int rc;
 
         rc = git_blame_file(&blame, repo, path.c_str(), NULL);
-        
+
         if(rc) {
 			return;
 		}
@@ -51,10 +52,10 @@ public:
         git_commit_lookup(&commit, repo, &hunk->final_commit_id);
         sig = git_commit_committer(commit);
 
-		lineMetrics.update(git_commit_time(commit), hunk->lines_in_hunk);
-        
+		lineMetrics.addLineBlock(git_commit_time(commit), hunk->lines_in_hunk);
+
         if(sig) {
-            stocks.find(sig).lineMetrics().update(git_commit_time(commit), hunk->lines_in_hunk);
+            stocks.find(sig).addLineBlock(git_commit_time(commit), hunk->lines_in_hunk);
         }
 
         git_commit_free(commit);
@@ -63,7 +64,7 @@ public:
 
 FileMetrics::FileMetrics(const git_tree *tree, const string& path,
     const git_commit *newestCommit)
-    : pImpl(new FileMetricsImpl(tree, path, newestCommit)) {
+    : LineAgeMetrics(), pImpl(new FileMetricsImpl(*this, tree, path, newestCommit)) {
 
 }
 
@@ -73,10 +74,6 @@ FileMetrics::~FileMetrics() {
 
 const string& FileMetrics::path() const {
 	return pImpl->path;
-}
-
-const LineAgeMetrics& FileMetrics::lineMetrics() const {
-	return pImpl->lineMetrics;
 }
 
 const StockCollection& FileMetrics::stocks() const {

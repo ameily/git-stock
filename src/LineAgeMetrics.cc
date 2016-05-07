@@ -16,7 +16,7 @@ public:
 	mpz_class sqsum;
 	mpz_class firstCommitTimestamp;
 	mpz_class lastCommitTimestamp;
-	
+
 	LineAgeMetricsImpl()
 		: count(0), sum(0), sqsum(0), firstCommitTimestamp(0),
 		lastCommitTimestamp(0) {
@@ -37,7 +37,7 @@ const mpz_class& LineAgeMetrics::lastCommitTimestamp() const {
 const mpz_class& LineAgeMetrics::firstCommitTimestamp() const {
 	return pImpl->firstCommitTimestamp;
 }
-
+/*
 mpz_class LineAgeMetrics::sum(const mpz_class& offset) const {
 	return offset > 0 ? (pImpl->count * offset) - pImpl->sum : pImpl->sum;
 }
@@ -47,14 +47,14 @@ mpz_class LineAgeMetrics::sqsum(const mpz_class& offset) const {
 		(pImpl->sqsum - (2 * offset * pImpl->sum)) + (pImpl->count * offset * offset)
 		: pImpl->sqsum;
 }
-
-const mpz_class& LineAgeMetrics::count() const {
+*/
+const mpz_class& LineAgeMetrics::lineCount() const {
 	return pImpl->count;
 }
 
-mpz_class LineAgeMetrics::variance(const mpz_class& offset) const {
+mpz_class LineAgeMetrics::lineAgeVariance(const mpz_class& offset) const {
 	mpz_class sum, sqsum;
-	
+
 	if(offset) {
 		//
 		// sum     = a + b + c
@@ -69,15 +69,15 @@ mpz_class LineAgeMetrics::variance(const mpz_class& offset) const {
 		sum = pImpl->sum;
 		sqsum = pImpl->sqsum;
 	}
-	
+
 	return pImpl->count > 1 ?
 		(sqsum - (sum * sum) / pImpl->count) / (pImpl->count - 1)
 		: mpz_class(0);
 }
 
-mpz_class LineAgeMetrics::mean(const mpz_class& offset) const {
+mpz_class LineAgeMetrics::lineAgeMean(const mpz_class& offset) const {
 	mpz_class sum;
-	
+
 	if(offset) {
 		//
 		// sum   = a + b + c
@@ -89,16 +89,16 @@ mpz_class LineAgeMetrics::mean(const mpz_class& offset) const {
 	} else {
 		sum = pImpl->sum;
 	}
-	
+
 	return pImpl->count > 0 ? sum / pImpl->count : mpz_class(0);
 }
 
-mpz_class LineAgeMetrics::standardDeviation(const mpz_class& offset) const {
+mpz_class LineAgeMetrics::lineAgeStandardDeviation(const mpz_class& offset) const {
 	//return sqrt(variance(offset));
-	mpz_class var = variance(offset);
+	mpz_class var = lineAgeVariance(offset);
 	return var > 0 ? sqrt(var) : mpz_class(0);
 }
-
+/*
 mpz_class LineAgeMetrics::localSum() const {
 	return sum(pImpl->lastCommitTimestamp);
 }
@@ -130,39 +130,38 @@ mpz_class LineAgeMetrics::globalVariance() const {
 mpz_class LineAgeMetrics::globalStandardDeviation() const {
 	return standardDeviation(GitStockOptions::get().nowTimestamp);
 }
-
-void LineAgeMetrics::update(uint64_t timestamp, int count) {
+*/
+void LineAgeMetrics::addLineBlock(uint64_t timestamp, int count) {
 	mpz_class diff = timestamp * count;
 	pImpl->count += count;
 	pImpl->sum += diff;
-	
+
 	for(int i = 0; i < count; ++i) {
 		pImpl->sqsum += timestamp * timestamp;
 	}
 	//pImpl->sqsum += diff * diff;
-	
+
 	if(!pImpl->firstCommitTimestamp || pImpl->firstCommitTimestamp > timestamp) {
 		pImpl->firstCommitTimestamp = timestamp;
 	}
-	
+
 	if(timestamp > pImpl->lastCommitTimestamp) {
 		pImpl->lastCommitTimestamp = timestamp;
 	}
 }
 
-void LineAgeMetrics::update(const LineAgeMetrics& other) {
+void LineAgeMetrics::updateLineAgeMetrics(const LineAgeMetrics& other) {
 	pImpl->count += other.pImpl->count;
 	pImpl->sum += other.pImpl->sum;
 	pImpl->sqsum += other.pImpl->sqsum;
-	
+
 	if(!pImpl->firstCommitTimestamp || pImpl->firstCommitTimestamp > other.pImpl->firstCommitTimestamp) {
 		pImpl->firstCommitTimestamp = other.pImpl->firstCommitTimestamp;
 	}
-	
+
 	if(other.pImpl->lastCommitTimestamp > pImpl->lastCommitTimestamp) {
 		pImpl->lastCommitTimestamp = other.pImpl->lastCommitTimestamp;
 	}
 }
 
 }
-

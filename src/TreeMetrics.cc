@@ -1,12 +1,12 @@
 
 #include "TreeMetrics.hh"
 #include "FileMetrics.hh"
-#include "LineAgeMetrics.hh"
 #include "Stock.hh"
 #include "util.hh"
 #include "Options.hh"
 #include <string>
 #include <iostream>
+#include <git2/blob.h>
 
 using namespace std;
 
@@ -27,15 +27,15 @@ class TreeMetricsImpl {
 public:
     int fileCount;
     vector<FileMetrics*> files;
-    LineAgeMetrics lineMetrics;
+    LineAgeMetrics& lineMetrics;
     StockCollection stocks;
     string name;
     string path;
-    
 
-    TreeMetricsImpl(const string& path, const git_tree *tree, const git_commit *newestCommit)
-        : fileCount(0), path(path) {
-			
+
+    TreeMetricsImpl(LineAgeMetrics& lineMetrics, const string& path, const git_tree *tree, const git_commit *newestCommit)
+        : lineMetrics(lineMetrics), fileCount(0), path(path) {
+
         TreeWalkState state;
         git_repository *repo = git_tree_owner(tree);
         state.tree = tree;
@@ -45,21 +45,21 @@ public:
         name = basename(path.c_str());
 
         git_tree_walk(tree, GIT_TREEWALK_PRE, treeMetricsCallback, &state);
-        
+
         stocks.sort();
     }
 
     void update(FileMetrics *metrics) {
         ++fileCount;
         files.push_back(metrics);
-        lineMetrics.update(metrics->lineMetrics());
-        
+        lineMetrics.updateLineAgeMetrics(*metrics);
+
         stocks.update(metrics->stocks());
     }
 };
 
 TreeMetrics::TreeMetrics(const string& path, const git_tree *tree, const git_commit *newestCommit)
-    : pImpl(new TreeMetricsImpl(path, tree, newestCommit)) {
+    : LineAgeMetrics(), pImpl(new TreeMetricsImpl(*this, path, tree, newestCommit)) {
 
 }
 
@@ -69,10 +69,6 @@ TreeMetrics::~TreeMetrics() {
 
 int TreeMetrics::fileCount() const {
     return pImpl->fileCount;
-}
-
-const LineAgeMetrics& TreeMetrics::lineMetrics() const {
-	return pImpl->lineMetrics;
 }
 
 vector<FileMetrics*>::const_iterator TreeMetrics::begin() const {
@@ -92,13 +88,13 @@ bool isTextBlob(git_repository *repo, const git_tree_entry *entry) {
 	git_blob *blob;
 	int rc = git_blob_lookup(&blob, repo, git_tree_entry_id(entry));
 	bool isText = false;
-	
+
 	if(!rc) {
 		isText = (!git_blob_is_binary(blob) &&
 				  git_tree_entry_filemode(entry) == GIT_FILEMODE_BLOB);
 		git_blob_free(blob);
 	}
-	
+
 	return isText;
 }
 
@@ -107,9 +103,9 @@ int treeMetricsCallback(const char *root, const git_tree_entry *entry, void *pay
         TreeWalkState *state = (TreeWalkState*)payload;
         GitStockOptions& opts = GitStockOptions::get();
         string path = root;
-		
+
 		path += git_tree_entry_name(entry);
-        
+
         if(!opts.shouldIgnorePath(path) && isTextBlob(git_tree_owner(state->tree), entry)) {
 			FileMetrics *metrics = new FileMetrics(state->tree, path, state->newestCommit);
 			state->pImpl->update(metrics);

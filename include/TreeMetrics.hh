@@ -2,30 +2,29 @@
 #ifndef GITSTOCKTREEMETRICS_HH
 #define GITSTOCKTREEMETRICS_HH
 
-#include <git2.h>
+#include <git2/tree.h>
+#include <git2/commit.h>
 #include <cstdint>
 #include <vector>
 #include <string>
+#include "LineAgeMetrics.hh"
 
 namespace gitstock {
 
 class FileMetrics;
-class LineAgeMetrics;
 class TreeMetricsImpl;
 class StockCollection;
 
-class TreeMetrics {
+class TreeMetrics : public LineAgeMetrics {
 public:
     TreeMetrics(const std::string& path, const git_tree *tree, const git_commit *newestCommit = nullptr);
     virtual ~TreeMetrics();
-
-	const LineAgeMetrics& lineMetrics() const;
     int fileCount() const;
-    
+
     const StockCollection& stocks() const;
     const std::string& name() const;
     const std::string& path() const;
-    
+
     std::vector<FileMetrics*>::const_iterator begin() const;
     std::vector<FileMetrics*>::const_iterator end() const;
 
