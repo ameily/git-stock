@@ -39,16 +39,16 @@ int parseArgs(int argc, char **argv, bool& shouldExit) {
 	int option_index = 0;
 	int rc = 0;
 	int c;
-	
+
     shouldExit = false;
-    
+
     while(1) {
 		c = getopt_long(argc, argv, "hvC:n",
                         long_options, &option_index);
         if(c == -1) {
 			break;
 		}
-		
+
 		switch(c) {
 		case 'v':
 			opts.verbose = true;
@@ -79,46 +79,46 @@ int parseArgs(int argc, char **argv, bool& shouldExit) {
 			break;
 		}
 	}
-	
+
 	if(!rc && !shouldExit && optind < argc) {
 		opts.refName = argv[optind];
 		cout << "ref: " << opts.refName << "\n";
 	}
-	
+
 	return rc;
 }
 
 git_commit* resolveRef(git_repository *repo, const string& refName) {
-	git_commit *commit = nullptr;	
+	git_commit *commit = nullptr;
 	git_object *obj;
-	
+
 	if(git_revparse_single(&obj, repo, refName.c_str())) {
 		cerr << "ref not found\n";
 		return nullptr;
 	}
-	
+
 	if(git_object_type(obj) != GIT_OBJ_COMMIT) {
 		cerr << "ref is not a commit\n";
 		git_object_free(obj);
 	} else {
 		commit = (git_commit*)obj;
 	}
-		
+
     return commit;
 }
 
 string resolveRepoPath(const string& path) {
     char buff[PATH_MAX];
     string resolved;
-    
+
     realpath(path.c_str(), buff);
-    
+
     resolved = buff;
-    
+
     if(resolved.find("/.git", resolved.length() - 5) != string::npos) {
         resolved = path.substr(0, resolved.length() - 5);
     }
-    
+
     return resolved;
 }
 
@@ -136,14 +136,14 @@ int main(int argc, char **argv) {
     if((rc = parseArgs(argc, argv, shouldExit)) != 0 || shouldExit) {
 		return rc;
 	}
-	
+
 	git_libgit2_init();
 
     if((rc = git_repository_open_ext(&repo, opts.repoPath.c_str(), 0, nullptr))) {
         cerr << "failed to open repo: " << rc << "\n";
         return rc;
     }
-    
+
     opts.repoPath = resolveRepoPath(git_repository_path(repo));
 
 	commit = resolveRef(repo, opts.refName);
@@ -152,14 +152,14 @@ int main(int argc, char **argv) {
         cerr << "failed to get ref tree\n";
         return rc;
     }
-    
+
     if(opts.useMailMapFile) {
         opts.loadMailMap(opts.repoPath + "/.mailmap");
     }
-    
-    metrics = new TreeMetrics(opts.repoPath, tree);
+
+    metrics = new TreeMetrics(opts.repoPath, tree, commit);
     report.report(cout, *metrics);
-	
+
 	delete metrics;
 	return 0;
 }

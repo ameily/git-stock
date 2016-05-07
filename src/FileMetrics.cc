@@ -23,10 +23,16 @@ public:
         git_repository *repo = git_tree_owner(tree);
         git_blame *blame;
         git_commit *commit;
-        uint32_t hunkCount;
+		uint32_t hunkCount;
         int rc;
+		git_blame_options opts = GIT_BLAME_OPTIONS_INIT;
 
-        rc = git_blame_file(&blame, repo, path.c_str(), NULL);
+		if(newestCommit) {
+			const git_oid *commitId = git_commit_id(newestCommit);
+			opts.newest_commit = *commitId;
+		}
+
+        rc = git_blame_file(&blame, repo, path.c_str(), &opts);
 
         if(rc) {
 			return;
