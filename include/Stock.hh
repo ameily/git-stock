@@ -44,6 +44,8 @@ public:
     std::vector<Stock*>::const_iterator begin() const;
     std::vector<Stock*>::const_iterator end() const;
     
+    void sort();
+    
     Stock& find(const git_signature *sig);
     Stock& find(const Stock& stock);
     

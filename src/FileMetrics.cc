@@ -38,6 +38,8 @@ public:
             addHunk(repo, hunk);
         }
 
+        stocks.sort();
+
         git_blame_free(blame);
     }
 

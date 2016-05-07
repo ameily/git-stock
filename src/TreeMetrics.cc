@@ -45,6 +45,8 @@ public:
         name = basename(path.c_str());
 
         git_tree_walk(tree, GIT_TREEWALK_PRE, treeMetricsCallback, &state);
+        
+        stocks.sort();
     }
 
     void update(FileMetrics *metrics) {

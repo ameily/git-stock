@@ -7,6 +7,16 @@ using namespace std;
 
 namespace gitstock {
 
+namespace {
+
+struct StockPtrSorter {
+    bool operator() (Stock *i, Stock *j) {
+      return i->lineMetrics().count() > j->lineMetrics().count();
+    }
+};
+
+}
+
 class StockImpl {
 public:
     string email;
@@ -20,7 +30,6 @@ public:
     StockImpl(const string& email, const string& name)
         : email(email), name(name) {
     }
-    
 };
 
 Stock::Stock(const git_signature *sig) : pImpl(new StockImpl(sig)) {
@@ -97,6 +106,10 @@ public:
             find(stock->email(), stock->name()).update(*stock);
         }
     }
+    
+    void sort() {
+        std::sort(collection.begin(), collection.end(), StockPtrSorter());
+    }
 };
 
 StockCollection::StockCollection() : pImpl(new StockCollectionImpl) {
@@ -128,6 +141,10 @@ vector<Stock*>::const_iterator StockCollection::end() const {
 
 void StockCollection::update(const StockCollection& other) {
     pImpl->update(*other.pImpl);
+}
+
+void StockCollection::sort() {
+    pImpl->sort();
 }
 
 }
