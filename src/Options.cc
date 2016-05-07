@@ -65,7 +65,6 @@ void parseMailmap(const string& path) {
         parts = split(line, " \t\r\n");
         
         for(string part : parts) {
-            cout << ">> " << part << "\n";
             if(part[0] == '<') {
                 int end = part.length() - 1;
                 if(part[end] == '>') {
