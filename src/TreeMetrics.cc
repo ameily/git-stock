@@ -145,4 +145,24 @@ const string& TreeMetrics::name() const {
     return pImpl->name;
 }
 
+Json::Value TreeMetrics::toJson() const {
+    Json::Value json(Json::objectValue);
+    Json::Value& files = json["files"] = Json::arrayValue;
+    
+    uint64_t offset = GitStockOptions::get().nowTimestamp;
+    if(!offset) {
+        offset = (uint64_t)pImpl->lineMetrics.lastCommitTimestamp().get_ui();
+    }
+    
+    for(const FileMetrics *fileMetrics : pImpl->files) {
+        files.append(fileMetrics->toJson(offset));
+    }
+    
+    json["stocks"] = pImpl->stocks.toJson(offset);
+    
+    return json;
+    
+}
+
+
 }

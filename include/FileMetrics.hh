@@ -7,6 +7,7 @@
 #include <git2/tree.h>
 #include <git2/commit.h>
 #include "LineAgeMetrics.hh"
+#include <jsoncpp/json/json.h>
 
 namespace gitstock {
 
@@ -22,6 +23,7 @@ public:
 	const std::string& path() const;
 
     const StockCollection& stocks() const;
+    Json::Value toJson(const mpz_class& offset) const;
 
 private:
     FileMetricsImpl *pImpl;

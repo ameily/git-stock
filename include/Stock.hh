@@ -8,6 +8,7 @@
 #include <git2/signature.h>
 #include <ostream>
 #include "LineAgeMetrics.hh"
+#include <jsoncpp/json/json.h>
 
 
 namespace gitstock {
@@ -26,6 +27,7 @@ public:
     void update(const Stock& other);
 
     std::string toString() const;
+    Json::Value toJson(const mpz_class& offset = 0) const;
 
 private:
     StockImpl *pImpl;
@@ -48,6 +50,8 @@ public:
     Stock& find(const Stock& stock);
 
     void update(const StockCollection& other);
+    
+    Json::Value toJson(const mpz_class& offset = 0) const;
 
 private:
     StockCollectionImpl *pImpl;

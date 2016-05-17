@@ -4,6 +4,7 @@
 #include "util.hh"
 #include "LineAgeMetrics.hh"
 #include "PlainTextReport.hh"
+#include "CommitTimeline.hh"
 #include "Options.hh"
 #include <git2.h>
 #include <limits.h>
@@ -122,14 +123,35 @@ string resolveRepoPath(const string& path) {
     return resolved;
 }
 
+void run(GitStockOptions& opts, git_commit *commit) {
+    CommitTimeline *timeline;
+    
+    cout << "Building timeline... " << flush;
+    timeline = new CommitTimeline(commit);
+    cout << "done\n"
+        << "Days with activity: " << timeline->days() << "\n"
+        << "Total Commits:      " << timeline->commits() << "\n";
+    
+    for(const CommitDay *day : *timeline) {
+        git_tree *tree;
+        TreeMetrics *metrics;
+        git_commit *last = day->commits().back();
+        
+        cout << "Processing Day: " << day->date() << " ("
+            << day->commits().size() << ")... " << flush;
+        git_commit_tree(&tree, last);
+        metrics = new TreeMetrics(opts.repoPath, tree, last);
+        cout << "done\n";
+        
+        delete metrics;
+    }
+}
+
 
 int main(int argc, char **argv) {
 	git_repository *repo;
     int rc;
-    git_tree *tree;
     git_commit *commit;
-    TreeMetrics *metrics = nullptr;
-    PlainTextReport report;
     GitStockOptions& opts = GitStockOptions::get();
     bool shouldExit;
 
@@ -148,18 +170,12 @@ int main(int argc, char **argv) {
 
 	commit = resolveRef(repo, opts.refName);
 
-    if((rc = git_commit_tree(&tree, commit))) {
-        cerr << "failed to get ref tree\n";
-        return rc;
-    }
-
     if(opts.useMailMapFile) {
         opts.loadMailMap(opts.repoPath + "/.mailmap");
     }
 
-    metrics = new TreeMetrics(opts.repoPath, tree, commit);
-    report.report(cout, *metrics);
-
-	delete metrics;
+    run(opts, commit);
+	
+	
 	return 0;
 }

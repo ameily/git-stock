@@ -8,6 +8,7 @@
 #include <vector>
 #include <string>
 #include "LineAgeMetrics.hh"
+#include <jsoncpp/json/json.h>
 
 namespace gitstock {
 
@@ -27,6 +28,8 @@ public:
 
     std::vector<FileMetrics*>::const_iterator begin() const;
     std::vector<FileMetrics*>::const_iterator end() const;
+    
+    Json::Value toJson() const;
 
 private:
     TreeMetricsImpl *pImpl;

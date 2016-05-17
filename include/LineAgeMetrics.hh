@@ -5,6 +5,10 @@
 #include <stdint.h>
 #include <gmpxx.h>
 
+namespace Json {
+class Value;
+}
+
 namespace gitstock {
 
 class LineAgeMetricsImpl;
@@ -32,6 +36,8 @@ public:
 
 	void addLineBlock(uint64_t timestamp, int lines);
 	void updateLineAgeMetrics(const LineAgeMetrics& other);
+    
+    void toJson(Json::Value& json, const mpz_class& offset = 0) const;
 
 private:
 	LineAgeMetricsImpl *pImpl;

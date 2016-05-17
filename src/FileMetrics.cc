@@ -25,7 +25,7 @@ public:
         git_commit *commit;
 		uint32_t hunkCount;
         int rc;
-		git_blame_options opts = GIT_BLAME_OPTIONS_INIT;
+	git_blame_options opts = GIT_BLAME_OPTIONS_INIT;
 
 		if(newestCommit) {
 			const git_oid *commitId = git_commit_id(newestCommit);
@@ -85,5 +85,16 @@ const string& FileMetrics::path() const {
 const StockCollection& FileMetrics::stocks() const {
     return pImpl->stocks;
 }
+
+Json::Value FileMetrics::toJson(const mpz_class& offset) const {
+    Json::Value json;
+    LineAgeMetrics::toJson(json, offset);
+    
+    json["path"] = pImpl->path;
+    json["stocks"] = pImpl->stocks.toJson();
+    
+    return json;
+}
+
 
 }

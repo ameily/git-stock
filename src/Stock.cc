@@ -58,6 +58,17 @@ void Stock::update(const Stock& other) {
     updateLineAgeMetrics(other);
 }
 
+Json::Value Stock::toJson(const mpz_class& offset) const {
+    Json::Value json;
+    
+    LineAgeMetrics::toJson(json, offset);
+    json["name"] = pImpl->name;
+    json["email"] = pImpl->email;
+    
+    return json;
+}
+
+
 ostream& operator<<(ostream& os, const Stock& stock) {
     return os << stock.name() << " <" << stock.email() << ">";
 }
@@ -137,5 +148,15 @@ void StockCollection::update(const StockCollection& other) {
 void StockCollection::sort() {
     pImpl->sort();
 }
+
+Json::Value StockCollection::toJson(const mpz_class& offset) const {
+    Json::Value json(Json::arrayValue);
+    for(const Stock *stock : pImpl->collection) {
+        json.append(stock->toJson(offset));
+    }
+    
+    return json;
+}
+
 
 }
