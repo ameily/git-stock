@@ -6,22 +6,37 @@
 #include "PlainTextReport.hh"
 #include "CommitTimeline.hh"
 #include "Options.hh"
+#include "GitStockLog.hh"
+#include  "GitStockProgress.hh"
+#include <atomic>
 #include <git2.h>
+#include <fstream>
+#include <jsoncpp/json/json.h>
 #include <limits.h>
+#include <signal.h>
+#include <thread>
 #include <getopt.h>
 
 using namespace std;
 using namespace gitstock;
 
+
+static atomic_bool running(true);
+static GitStockLog logger = GitStockLog::getLogger();
+static GitStockProgress *progress = nullptr;
+
+
 static void printUsage(const string& app) {
 	cerr << "usage: " << app << " [options] [<refname>]\n"
 		<< "\n"
-		<< " -C, --directory=<path>		Run as if executed from <path>.\n"
+		<< " -C, --directory=<path>     Run as if executed from <path>.\n"
 		<< " -n, --now                  Calculate age metrics from now rather than most recent commit in file/ref.\n"
-		<< " --exclude=<pattern>		Exclude file <pattern> from processing.\n"
+        << " -o, --output=<path>        Write JSON report to directory <path>.\n"
+		<< " --exclude=<pattern>        Exclude file <pattern> from processing.\n"
 		<< "                            Can be specified multiple times.\n"
-		<< " -v, --verbose				Verbose output.\n"
-		<< " --use-mailmap				Use mailmap file.\n"
+        << " -t, --threads=N            Spawn N number of threads (default: 4)\n"
+		<< " -v, --verbose              Verbose output.\n"
+		<< " --use-mailmap              Use mailmap file.\n"
 		<< "\n";
 }
 
@@ -32,6 +47,8 @@ static option long_options[] = {
 	{"use-mailmap", no_argument, 0, 'M'},
 	{"directory", required_argument, 0, 'C'},
 	{"now", no_argument, 0, 'n'},
+    {"threads", required_argument, 0, 't'},
+    {"output", required_argument, 0, 'o'},
 	{0, 0, 0, 0}
 };
 
@@ -44,7 +61,7 @@ int parseArgs(int argc, char **argv, bool& shouldExit) {
     shouldExit = false;
 
     while(1) {
-		c = getopt_long(argc, argv, "hvC:n",
+		c = getopt_long(argc, argv, "hvC:nt:o:",
                         long_options, &option_index);
         if(c == -1) {
 			break;
@@ -71,6 +88,17 @@ int parseArgs(int argc, char **argv, bool& shouldExit) {
 		case 'n':
 			opts.nowTimestamp = time(nullptr);
 			break;
+        case 't':
+            opts.threads = atoi(optarg);
+            if(opts.threads <= 0) {
+                cerr << argv[0] << "invalid thread count: " << optarg << "\n";
+                printUsage(argv[0]);
+                rc = 1;
+            }
+            break;
+        case 'o':
+            opts.destination = optarg;
+            break;
 		case '?':
 			rc = 1;
 			break;
@@ -123,8 +151,69 @@ string resolveRepoPath(const string& path) {
     return resolved;
 }
 
+void signalHandler(int sig) {
+    running.store(false);
+    if(progress) {
+        progress->cancel();
+    }
+    //cout << "\nstopping\n";
+}
+
+/**
+ * Output the TreeMetrics JSON report to a file in the destination directory.
+ */
+void writeOutput(const string& destination, const CommitDay *day, const TreeMetrics *metrics) {
+    string path = destination + '/' + day->shortDay() + ".json";
+    Json::Value root = metrics->toJson();
+    Json::StyledStreamWriter writer("    ");
+    ofstream out;
+    
+    out.open(path.c_str());
+    writer.write(out, root);
+    out.close();
+}
+
+
+
+void worker(CommitTimeline *timeline, GitStockOptions& opts) {
+    CommitDay *day;
+    git_tree *tree;
+    TreeMetrics *metrics;
+    git_commit *last;
+    
+    while(running.load()) {
+        day = timeline->pop();
+        if(!day) {
+            break;
+        }
+        
+        last = day->commits().back();
+        git_commit_tree(&tree, last);
+        
+        //logger.debug() << "processing day " << day->date() << " ("
+        //    << day->commits().size() << " commits)" << endlog;
+        
+        metrics = new TreeMetrics(opts.repoPath, tree, last);
+        
+        if(progress && running.load()) {
+            progress->tick();
+        }
+        
+        writeOutput(opts.destination, day, metrics);
+        
+        delete metrics;
+        timeline->release(day);
+    }
+}
+
 void run(GitStockOptions& opts, git_commit *commit) {
     CommitTimeline *timeline;
+    vector<thread*> threads;
+    bool threadsActive = true;
+    
+    progress = new GitStockProgress(80);
+    
+    threads.reserve(opts.threads);
     
     cout << "Building timeline... " << flush;
     timeline = new CommitTimeline(commit);
@@ -132,19 +221,18 @@ void run(GitStockOptions& opts, git_commit *commit) {
         << "Days with activity: " << timeline->days() << "\n"
         << "Total Commits:      " << timeline->commits() << "\n";
     
-    for(const CommitDay *day : *timeline) {
-        git_tree *tree;
-        TreeMetrics *metrics;
-        git_commit *last = day->commits().back();
-        
-        cout << "Processing Day: " << day->date() << " ("
-            << day->commits().size() << ")... " << flush;
-        git_commit_tree(&tree, last);
-        metrics = new TreeMetrics(opts.repoPath, tree, last);
-        cout << "done\n";
-        
-        delete metrics;
+    progress->setTotal(timeline->days());
+    progress->draw();
+    for(int i = 0; i < opts.threads; ++i) {
+        thread *t = new thread(worker, timeline, std::ref(opts));
+        threads.push_back(t);
     }
+    
+    for(thread *t : threads) {
+        t->join();
+    }
+    
+    cout << "All threads finished\n";
 }
 
 
@@ -158,6 +246,8 @@ int main(int argc, char **argv) {
     if((rc = parseArgs(argc, argv, shouldExit)) != 0 || shouldExit) {
 		return rc;
 	}
+	
+	signal(SIGINT, signalHandler);
 
 	git_libgit2_init();
 
