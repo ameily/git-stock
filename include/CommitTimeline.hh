@@ -45,11 +45,15 @@ public:
     virtual ~CommitDay();
     
     std::string date() const;
+    std::string shortDay() const;
     int64_t timestamp() const;
     const std::vector<git_commit*>& commits() const;
     
     std::vector<git_commit*>::const_iterator begin() const;
     std::vector<git_commit*>::const_iterator end() const;
+    
+    bool isPendingRelease() const;
+    void release();
     
 private:
     CommitDayImpl *pImpl;
@@ -65,6 +69,9 @@ public:
     int commits() const;
     std::vector<CommitDay*>::const_iterator begin() const;
     std::vector<CommitDay*>::const_iterator end() const;
+    
+    CommitDay* pop();
+    void release(CommitDay *day);
 
 private:
     CommitTimelineImpl *pImpl;

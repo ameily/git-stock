@@ -48,6 +48,12 @@ public:
 
         stocks.sort();
     }
+    
+    ~TreeMetricsImpl() {
+        for(FileMetrics *metrics : files) {
+            delete metrics;
+        }
+    }
 
     void update(FileMetrics *metrics) {
         ++fileCount;

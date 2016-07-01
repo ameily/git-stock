@@ -27,15 +27,20 @@
  */
 
 #include "CommitTimeline.hh"
+#include "GitStockLog.hh"
 #include <set>
 #include <unordered_map>
 #include <algorithm>
 #include <iostream>
+#include <list>
+#include <mutex>
+
 
 using namespace std;
 
 namespace gitstock {
-    
+
+static GitStockLog logger = GitStockLog::getLogger();    
 static const int64_t SECONDS_PER_DAY = 86400; // seconds in a day
 
 struct TimelineBuilder {
@@ -49,12 +54,20 @@ public:
     //set<string> known;
     //unordered_map<int64_t, vector<git_commit*>> builder;
     vector<CommitDay*> timeline;
+    list<CommitDay*> activeDays;
     int commits;
+    mutex timelineMutex;
+    int popIndex;
+    int releaseIndex;
     
-    CommitTimelineImpl(git_commit *head) : commits(0) {
+    CommitTimelineImpl(git_commit *head) : commits(0), popIndex(0), releaseIndex(0) {
         TimelineBuilder builder;
         addCommit(head, builder);
         build(builder);
+    }
+    
+    ~CommitTimelineImpl() {
+        
     }
     
     void addCommit(git_commit *commit, TimelineBuilder& builder) {
@@ -88,6 +101,37 @@ public:
             
             commits.clear();
         }
+        reverse(timeline.begin(), timeline.end());
+    }
+    
+    CommitDay* pop() {
+        unique_lock<mutex> lock(timelineMutex);
+        CommitDay *day;
+        if(popIndex < timeline.size()) {
+            day = timeline[popIndex];
+            ++popIndex;
+            
+            //cout << "Processing day: " << day->date() << " (" << day->commits().size() << ")\n";
+        } else {
+            day = nullptr;
+        }
+        
+        return day;
+    }
+    
+    void release(CommitDay *day) {
+        unique_lock<mutex> lock(timelineMutex);
+        day->release();
+        for(; releaseIndex < timeline.size(); ++releaseIndex) {
+            CommitDay *cd = timeline[releaseIndex];
+            if(cd->isPendingRelease()) {
+                //logger.debug() << "releasing commit day " << cd->date() << endlog;
+                timeline[releaseIndex] = nullptr;
+                delete cd;
+            } else {
+                break;
+            }
+        }
     }
 };    
 
@@ -116,6 +160,15 @@ std::vector< CommitDay* >::const_iterator CommitTimeline::end() const {
     return pImpl->timeline.end();
 }
 
+CommitDay* CommitTimeline::pop() {
+    return pImpl->pop();
+}
+
+void CommitTimeline::release(CommitDay* day) {
+    pImpl->release(day);
+}
+
+
 
 bool compareCommits(const git_commit *left, const git_commit *right) {
     return git_commit_time(left) < git_commit_time(right);
@@ -125,10 +178,17 @@ class CommitDayImpl {
 public:
     int64_t timestamp;
     vector<git_commit*> commits;
+    bool isPendingRelease;
     
     CommitDayImpl(int64_t timestamp, const vector<git_commit*>& commits)
-        : timestamp(timestamp), commits(commits) {
+        : timestamp(timestamp), commits(commits), isPendingRelease(false) {
         sort(this->commits.begin(), this->commits.end(), compareCommits);
+    }
+    
+    ~CommitDayImpl() {
+        for(git_commit *commit : commits) {
+            git_commit_free(commit);
+        }
     }
 };
 
@@ -161,6 +221,22 @@ string CommitDay::date() const {
     strftime(buff, 64, "%A %B %d, %Y", localtime(&pImpl->timestamp));
     return buff;
 }
+
+string CommitDay::shortDay() const {
+    char buff[64];
+    strftime(buff, 64, "%F", localtime(&pImpl->timestamp));
+    return buff;
+}
+
+
+bool CommitDay::isPendingRelease() const {
+    return pImpl->isPendingRelease;
+}
+
+void CommitDay::release() {
+    pImpl->isPendingRelease = true;
+}
+
 
 
 }
