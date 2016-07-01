@@ -17,7 +17,8 @@ public:
 	bool useMailMapFile;
 	bool verbose;
 	uint64_t nowTimestamp;
-    
+    int threads;
+    std::string destination;
     std::pair<std::string, std::string> resolveSignature(const std::string& email, const std::string& name) const;
 	
 	static GitStockOptions& get();

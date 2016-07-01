@@ -106,6 +106,8 @@ GitStockOptions& GitStockOptions::get() {
 		__options->useMailMapFile = false;
 		__options->verbose = false;
 		__options->nowTimestamp = 0;
+        __options->threads = 4;
+        __options->destination = "data";
 	}
 	return *__options;
 }
