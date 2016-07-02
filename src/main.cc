@@ -16,6 +16,7 @@
 #include <signal.h>
 #include <thread>
 #include <getopt.h>
+#include <sys/stat.h>
 
 using namespace std;
 using namespace gitstock;
@@ -49,8 +50,29 @@ static option long_options[] = {
 	{"now", no_argument, 0, 'n'},
     {"threads", required_argument, 0, 't'},
     {"output", required_argument, 0, 'o'},
+    {"history", no_argument, 0, 'H'},
+    {"pretty", no_argument, 0, 'p'},
 	{0, 0, 0, 0}
 };
+
+
+static bool isDirectory(const string& path) {
+    struct stat s;
+    if(stat(path.c_str(), &s)) {
+        return false;
+    }
+    
+    return S_ISDIR(s.st_mode);
+}
+
+static bool isFileOrNotExist(const string& path) {
+    struct stat s;
+    if(stat(path.c_str(), &s)) {
+        return true;
+    }
+    
+    return S_ISREG(s.st_mode);
+}
 
 int parseArgs(int argc, char **argv, bool& shouldExit) {
 	GitStockOptions& opts = GitStockOptions::get();
@@ -61,7 +83,7 @@ int parseArgs(int argc, char **argv, bool& shouldExit) {
     shouldExit = false;
 
     while(1) {
-		c = getopt_long(argc, argv, "hvC:nt:o:",
+		c = getopt_long(argc, argv, "hvC:nt:o:pH",
                         long_options, &option_index);
         if(c == -1) {
 			break;
@@ -99,6 +121,12 @@ int parseArgs(int argc, char **argv, bool& shouldExit) {
         case 'o':
             opts.destination = optarg;
             break;
+        case 'H':
+            opts.history = true;
+            break;
+        case 'p':
+            opts.pretty = true;
+            break;
 		case '?':
 			rc = 1;
 			break;
@@ -113,7 +141,21 @@ int parseArgs(int argc, char **argv, bool& shouldExit) {
 		opts.refName = argv[optind];
 		cout << "ref: " << opts.refName << "\n";
 	}
-
+	
+	if(opts.history) {
+        if(opts.destination.empty()) {
+            cerr << argv[0] << ": missing required argument -o/--output.\n";
+            return 1;
+        } else if(!isDirectory(opts.destination)) {
+            cerr << argv[0] << ": output path must be a directory when perform history analysis\n";
+            return 1;
+        }
+    } else if(!opts.destination.empty() && !isFileOrNotExist(opts.destination)) {
+        cerr << argv[0] << ": output path must be a regular file when performing single ref analysis\n";
+        return 1;
+    }
+    
+    
 	return rc;
 }
 
@@ -162,7 +204,11 @@ void signalHandler(int sig) {
 /**
  * Output the TreeMetrics JSON report to a file in the destination directory.
  */
-void writeOutput(const string& destination, const CommitDay *day, const TreeMetrics *metrics) {
+void writeOutput(GitStockOptions& opts, const CommitDay *day, const TreeMetrics *metrics) {
+    ostream *out;
+    if(!opts.destination) {
+        
+    }
     string path = destination + '/' + day->shortDay() + ".json";
     Json::Value root = metrics->toJson();
     Json::StyledStreamWriter writer("    ");
@@ -175,7 +221,7 @@ void writeOutput(const string& destination, const CommitDay *day, const TreeMetr
 
 
 
-void worker(CommitTimeline *timeline, GitStockOptions& opts) {
+void historyWorker(CommitTimeline *timeline, GitStockOptions& opts) {
     CommitDay *day;
     git_tree *tree;
     TreeMetrics *metrics;
@@ -203,10 +249,11 @@ void worker(CommitTimeline *timeline, GitStockOptions& opts) {
         
         delete metrics;
         timeline->release(day);
+        git_tree_free(tree);
     }
 }
 
-void run(GitStockOptions& opts, git_commit *commit) {
+int runHistory(GitStockOptions& opts, git_commit *commit) {
     CommitTimeline *timeline;
     vector<thread*> threads;
     bool threadsActive = true;
@@ -224,7 +271,7 @@ void run(GitStockOptions& opts, git_commit *commit) {
     progress->setTotal(timeline->days());
     progress->draw();
     for(int i = 0; i < opts.threads; ++i) {
-        thread *t = new thread(worker, timeline, std::ref(opts));
+        thread *t = new thread(historyWorker, timeline, std::ref(opts));
         threads.push_back(t);
     }
     
@@ -232,7 +279,23 @@ void run(GitStockOptions& opts, git_commit *commit) {
         t->join();
     }
     
-    cout << "All threads finished\n";
+    return 0;
+}
+
+int runSingle(GitStockOptions& opts, git_commit *commit) {
+    git_tree *tree;
+    TreeMetrics *metrics;
+    PlainTextReport report;
+    
+    git_commit_tree(&tree, commit);
+    metrics = new TreeMetrics(opts.repoPath, tree, commit);
+    
+    report.report();
+    
+    delete metrics;
+    git_tree_free(tree);
+    
+    return 0;
 }
 
 
@@ -264,8 +327,12 @@ int main(int argc, char **argv) {
         opts.loadMailMap(opts.repoPath + "/.mailmap");
     }
 
-    run(opts, commit);
+    if(opts.history) {
+        rc = runHistory(opts, commit);
+    } else {
+        rc = runSingle(opts, commit);
+    }
 	
 	
-	return 0;
+	return rc;
 }
