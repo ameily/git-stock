@@ -107,7 +107,9 @@ GitStockOptions& GitStockOptions::get() {
 		__options->verbose = false;
 		__options->nowTimestamp = 0;
         __options->threads = 4;
-        __options->destination = "data";
+        __options->destination = "";
+        __options->pretty = false;
+        __options->history = false;
 	}
 	return *__options;
 }

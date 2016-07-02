@@ -19,6 +19,8 @@ public:
 	uint64_t nowTimestamp;
     int threads;
     std::string destination;
+    bool pretty;
+    bool history;
     std::pair<std::string, std::string> resolveSignature(const std::string& email, const std::string& name) const;
 	
 	static GitStockOptions& get();
