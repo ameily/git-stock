@@ -72,8 +72,10 @@ public:
     }
     
     void draw() {
-        double perTick = (barWidth / (double)total) * 100.0;
-        double chunk = perTick;
+        //double perTick = (barWidth / (double)total) * 100.0;
+        double countPerBlock = total / (double)barWidth;
+        //double chunk = perTick;
+        double chunk = countPerBlock;
         ostream& os = logger.acquire();
         time_t diff = time(nullptr) - startTime;
         
@@ -83,13 +85,13 @@ public:
         
         os << "[";
         for(int i = 0; i < barWidth; ++i) {
-            if(chunk <= p) {
+            if(current >= chunk) {
                 os << "=";
             } else {
                 os << " ";
             }
             
-            chunk += perTick;
+            chunk += countPerBlock;
         }
         
         os << "] " << setw(5) << fixed << setprecision(1) << p << "%\n";
