@@ -242,7 +242,14 @@ int runHistory(GitStockOptions& opts, git_commit *commit) {
     CommitTimeline *timeline;
     vector<thread*> threads;
     bool threadsActive = true;
-    JsonReport report(opts);
+    JsonReport *report;
+    
+    try {
+        report = new JsonReport(opts);
+    } catch(runtime_error& err) {
+        cerr << err.what() << "\n";
+        return -1;
+    }
     
     progress = new GitStockProgress(80);
     
@@ -257,7 +264,7 @@ int runHistory(GitStockOptions& opts, git_commit *commit) {
     progress->setTotal(timeline->days());
     progress->draw();
     for(int i = 0; i < opts.threads; ++i) {
-        thread *t = new thread(historyWorker, timeline, std::ref(opts), std::ref(report));
+        thread *t = new thread(historyWorker, timeline, std::ref(opts), std::ref(*report));
         threads.push_back(t);
     }
     
@@ -265,7 +272,9 @@ int runHistory(GitStockOptions& opts, git_commit *commit) {
         t->join();
     }
     
-    report.close();
+    report->close();
+    
+    delete report;
     
     return 0;
 }
