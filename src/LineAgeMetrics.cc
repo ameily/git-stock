@@ -167,12 +167,12 @@ void LineAgeMetrics::updateLineAgeMetrics(const LineAgeMetrics& other) {
 
 void LineAgeMetrics::toJson(Json::Value& json, const mpz_class& offset) const {
     json = Json::objectValue;
-    json["lineCount"] = (Json::UInt64)pImpl->count.get_ui();
-    json["firstCommitTimestamp"] = (Json::UInt64)pImpl->firstCommitTimestamp.get_ui();
-    json["lastCommitTimestamp"] = (Json::UInt64)pImpl->lastCommitTimestamp.get_ui();
-    json["lineAgeVariance"] = (Json::UInt64)lineAgeVariance(offset).get_ui();
-    json["lineAgeStandardDeviation"] = (Json::UInt64)lineAgeStandardDeviation(offset).get_ui();
-    json["lineAgeMean"] = (Json::UInt64)(offset).get_ui();
+    json["LineCount"] = (Json::UInt64)pImpl->count.get_ui();
+    json["FirstCommitTimestamp"] = (Json::UInt64)pImpl->firstCommitTimestamp.get_ui();
+    json["LastCommitTimestamp"] = (Json::UInt64)pImpl->lastCommitTimestamp.get_ui();
+    json["LineAgeVariance"] = (Json::UInt64)lineAgeVariance(offset).get_ui();
+    json["LineAgeStandardDeviation"] = (Json::UInt64)lineAgeStandardDeviation(offset).get_ui();
+    json["LineAgeMean"] = (Json::UInt64)(offset).get_ui();
 }
 
 

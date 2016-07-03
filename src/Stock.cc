@@ -62,8 +62,8 @@ Json::Value Stock::toJson(const mpz_class& offset) const {
     Json::Value json;
     
     LineAgeMetrics::toJson(json, offset);
-    json["name"] = pImpl->name;
-    json["email"] = pImpl->email;
+    json["AuthorName"] = pImpl->name;
+    json["AuthorEmail"] = pImpl->email;
     
     return json;
 }

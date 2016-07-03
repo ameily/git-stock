@@ -35,6 +35,7 @@
 #include <jsoncpp/json/writer.h>
 #include <fstream>
 #include <mutex>
+#include <errno.h>
 
 using namespace std;
 
@@ -58,14 +59,34 @@ public:
         bldr["indentation"] = "";
         writer = bldr.newStreamWriter();
         
-        tree.open((opts.destination + "/tree.json").c_str());
-        stocks.open((opts.destination + "/stocks.json").c_str());
-        files.open((opts.destination + "/files.json").c_str());
-        stockFiles.open((opts.destination + "/stock_files.json").c_str());
+        openStream(opts.destination, "trees.json", tree);
+        openStream(opts.destination, "stocks.json", stocks);
+        openStream(opts.destination, "files.json", files);
+        openStream(opts.destination, "stock_files.json", stockFiles);
+    }
+    
+    int openStream(const string& dirname, const string& filename, ofstream& stream) {
+        string path = dirname;
+        if(path[path.length()-1] != '/') {
+            path += '/';
+        }
+        
+        path += filename;
+        stream.open(path);
+        
+        if(!stream.good()) {
+            string msg = "failed to open output file ";
+            msg += path;
+            msg += ": ";
+            msg += strerror(errno);
+            throw runtime_error(msg);
+        }
+        
+        return stream.good() ? 0 : errno;
     }
     
     Json::Value& normalize(const CommitDay *day, Json::Value& json) {
-        json["date"] = day->shortDay();
+        json["Timestamp"] = (Json::Int64)day->timestamp();
         return json;
     }
     
@@ -89,7 +110,7 @@ public:
             
             for(const Stock *stock : file->stocks()) {
                 Json::Value stockJson = stock->toJson(offset);
-                stockJson["path"] = file->path();
+                stockJson["FilePath"] = file->path();
                 writer->write(normalize(day, stockJson), &stockFiles); 
                 stockFiles << "\n";
             }

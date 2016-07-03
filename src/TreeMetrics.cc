@@ -154,6 +154,7 @@ const string& TreeMetrics::name() const {
 Json::Value TreeMetrics::toJson(const mpz_class& offset) const {
     Json::Value json;
     LineAgeMetrics::toJson(json, offset);
+    json["FileCount"] = pImpl->fileCount;
     //Json::Value& files = json["files"] = Json::arrayValue;
     
     return json;
