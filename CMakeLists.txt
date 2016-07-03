@@ -15,6 +15,7 @@ add_executable(git-stock
     src/CommitTimeline.cc
     src/GitStockLog.cc
     src/GitStockProgress.cc
+    src/JsonReport.cc
 )
 
 link_directories(/usr/local/lib)

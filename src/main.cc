@@ -8,6 +8,7 @@
 #include "Options.hh"
 #include "GitStockLog.hh"
 #include  "GitStockProgress.hh"
+#include "JsonReport.hh"
 #include <atomic>
 #include <git2.h>
 #include <fstream>
@@ -201,27 +202,10 @@ void signalHandler(int sig) {
     //cout << "\nstopping\n";
 }
 
-/**
- * Output the TreeMetrics JSON report to a file in the destination directory.
- */
-void writeOutput(GitStockOptions& opts, const CommitDay *day, const TreeMetrics *metrics) {
-    ostream *out;
-    if(!opts.destination) {
-        
-    }
-    string path = destination + '/' + day->shortDay() + ".json";
-    Json::Value root = metrics->toJson();
-    Json::StyledStreamWriter writer("    ");
-    ofstream out;
-    
-    out.open(path.c_str());
-    writer.write(out, root);
-    out.close();
-}
 
 
 
-void historyWorker(CommitTimeline *timeline, GitStockOptions& opts) {
+void historyWorker(CommitTimeline *timeline, GitStockOptions& opts, JsonReport& report) {
     CommitDay *day;
     git_tree *tree;
     TreeMetrics *metrics;
@@ -245,7 +229,8 @@ void historyWorker(CommitTimeline *timeline, GitStockOptions& opts) {
             progress->tick();
         }
         
-        writeOutput(opts.destination, day, metrics);
+        //writeOutput(opts.destination, day, metrics);
+        report.report(day, metrics);
         
         delete metrics;
         timeline->release(day);
@@ -257,6 +242,7 @@ int runHistory(GitStockOptions& opts, git_commit *commit) {
     CommitTimeline *timeline;
     vector<thread*> threads;
     bool threadsActive = true;
+    JsonReport report(opts);
     
     progress = new GitStockProgress(80);
     
@@ -271,13 +257,15 @@ int runHistory(GitStockOptions& opts, git_commit *commit) {
     progress->setTotal(timeline->days());
     progress->draw();
     for(int i = 0; i < opts.threads; ++i) {
-        thread *t = new thread(historyWorker, timeline, std::ref(opts));
+        thread *t = new thread(historyWorker, timeline, std::ref(opts), std::ref(report));
         threads.push_back(t);
     }
     
     for(thread *t : threads) {
         t->join();
     }
+    
+    report.close();
     
     return 0;
 }
@@ -290,7 +278,7 @@ int runSingle(GitStockOptions& opts, git_commit *commit) {
     git_commit_tree(&tree, commit);
     metrics = new TreeMetrics(opts.repoPath, tree, commit);
     
-    report.report();
+    report.report(cout, *metrics);
     
     delete metrics;
     git_tree_free(tree);

@@ -91,7 +91,7 @@ Json::Value FileMetrics::toJson(const mpz_class& offset) const {
     LineAgeMetrics::toJson(json, offset);
     
     json["path"] = pImpl->path;
-    json["stocks"] = pImpl->stocks.toJson();
+    //json["stocks"] = pImpl->stocks.toJson();
     
     return json;
 }

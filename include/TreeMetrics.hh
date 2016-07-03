@@ -29,7 +29,7 @@ public:
     std::vector<FileMetrics*>::const_iterator begin() const;
     std::vector<FileMetrics*>::const_iterator end() const;
     
-    Json::Value toJson() const;
+    Json::Value toJson(const mpz_class& offset = 0) const;
 
 private:
     TreeMetricsImpl *pImpl;
