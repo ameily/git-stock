@@ -46,6 +46,12 @@ namespace {
 const static string *WEEK_DAY_NAMES = new string[7] {
     "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
 };
+
+string getWeekDayName(int wday) {
+    stringstream ss;
+    ss << wday << " " << WEEK_DAY_NAMES[wday];
+    return ss.str();
+}
 }
 
 class JsonReportImpl {
@@ -149,7 +155,7 @@ public:
         
         json["Message"] = msg ? msg : ""; //git_commit_body(commit);
         json["Timestamp"] = (Json::Int64)timestamp;
-        json["DayOfTheWeek"] = WEEK_DAY_NAMES[t->tm_wday];
+        json["DayOfTheWeek"] = getWeekDayName(t->tm_wday);
         json["HourOfTheDay"] = t->tm_hour;
         json["_type"] = "commit";
         
