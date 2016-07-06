@@ -42,14 +42,16 @@ using namespace std;
 
 namespace gitstock {
 
+namespace {
+const static string *WEEK_DAY_NAMES = new string[7] {
+    "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
+};
+}
+
 class JsonReportImpl {
 public:
     GitStockOptions& opts;
-    
-    ofstream tree;
-    ofstream stocks;
-    ofstream files;
-    ofstream stockFiles;
+    ofstream stream;
     Json::StreamWriter *writer;
     
     mutex streamLock;
@@ -59,24 +61,18 @@ public:
         bldr["indentation"] = "";
         writer = bldr.newStreamWriter();
         
-        openStream(opts.destination, "trees.json", tree);
-        openStream(opts.destination, "stocks.json", stocks);
-        openStream(opts.destination, "files.json", files);
-        openStream(opts.destination, "stock_files.json", stockFiles);
+        openStream(opts.destination, stream);
+        //openStream(opts.destination, "stocks.json", stocks);
+        //openStream(opts.destination, "files.json", files);
+        //openStream(opts.destination, "stock_files.json", stockFiles);
     }
     
-    int openStream(const string& dirname, const string& filename, ofstream& stream) {
-        string path = dirname;
-        if(path[path.length()-1] != '/') {
-            path += '/';
-        }
-        
-        path += filename;
-        stream.open(path);
+    int openStream(const string& filename, ofstream& stream) {
+        stream.open(filename);
         
         if(!stream.good()) {
             string msg = "failed to open output file ";
-            msg += path;
+            msg += filename;
             msg += ": ";
             msg += strerror(errno);
             throw runtime_error(msg);
@@ -99,28 +95,71 @@ public:
         unique_lock<mutex> lock(streamLock);
         mpz_class offset = opts.nowTimestamp ? opts.nowTimestamp : metrics->lastCommitTimestamp();
         Json::Value treeJson = metrics->toJson(offset);
+        Json::Value dayJson = dayToJson(day);
         
-        writer->write(normalize(day, treeJson), &tree);
-        tree << "\n";
+        writer->write(dayJson, &stream);
+        stream << "\n";
+        writer->write(normalize(day, treeJson), &stream);
+        stream << "\n";
+        //tree << "\n";
         
         for(const FileMetrics *file : *metrics) {
             Json::Value fileJson = file->toJson(offset);
-            writer->write(normalize(day, fileJson), &files);
-            files << "\n";
+            writer->write(normalize(day, fileJson), &stream);
+            stream << "\n";
             
             for(const Stock *stock : file->stocks()) {
                 Json::Value stockJson = stock->toJson(offset);
                 stockJson["FilePath"] = file->path();
-                writer->write(normalize(day, stockJson), &stockFiles); 
-                stockFiles << "\n";
+                stockJson["_type"] = "stock-file";
+                writer->write(normalize(day, stockJson), &stream); 
+                stream << "\n";
             }
         }
         
         for(const Stock* stock : metrics->stocks()) {
             Json::Value stockJson = stock->toJson(offset);
-            writer->write(normalize(day, stockJson), &stocks);
-            stocks << "\n";
+            writer->write(normalize(day, stockJson), &stream);
+            stream << "\n";
         }
+        
+        for(git_commit *commit : day->commits()) {
+            //TODO
+            Json::Value json = commitToJson(commit);
+            writer->write(json, &stream);
+            stream << "\n";
+        }
+    }
+    
+    Json::Value dayToJson(const CommitDay *day) {
+        Json::Value json(Json::objectValue);
+        json["_type"] = "commit-day";
+        json["Timestamp"] = (Json::Int64)day->timestamp();
+        json["CommitCount"] = (Json::Int)day->commits().size();
+        
+        return json;
+    }
+    
+    Json::Value commitToJson(git_commit *commit) const {
+        Json::Value json(Json::objectValue);
+        const git_signature *sig = git_commit_committer(commit);
+        int64_t timestamp = git_commit_time(commit);
+        tm *t = localtime(&timestamp);
+        const char *msg = git_commit_message(commit);
+        
+        json["Message"] = msg ? msg : ""; //git_commit_body(commit);
+        json["Timestamp"] = (Json::Int64)timestamp;
+        json["DayOfTheWeek"] = WEEK_DAY_NAMES[t->tm_wday];
+        json["HourOfTheDay"] = t->tm_hour;
+        json["_type"] = "commit";
+        
+        if(sig) {
+            pair<string, string> resolved = GitStockOptions::get().resolveSignature(sig->email, sig->name);
+            json["AuthorEmail"] = resolved.first;
+            json["AuthorName"] = resolved.second;
+        }
+        
+        return json;
     }
 };
 
@@ -136,10 +175,7 @@ void JsonReport::report(const CommitDay* day, const TreeMetrics* metrics) {
 }
 
 void JsonReport::close() {
-    pImpl->files.close();
-    pImpl->stockFiles.close();
-    pImpl->stocks.close();
-    pImpl->tree.close();
+    pImpl->stream.close();
 }
 
 
