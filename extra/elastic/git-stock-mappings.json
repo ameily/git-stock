@@ -1,109 +1,144 @@
 {
-    "stocks": {
-        "properties": {
-            "Timestamp": {
-                "type": "date", 
-                "format": "epoch_second"
-            },
-            "LineAgeVariance": {"type": "number"},
-            "LineAgeStandardDeviation": {"type": "number"},
-            "LineAgeMean": {"type": "number"},
-            "FirstCommitTimestamp": {
-                "type": "date",
-                "format": "epoch_second"
-            },
-            "LastCommitTimestamp": {
-                "type": "date",
-                "format": "epoch_second"
-            },
-            "LineCount": {"type": "number"},
-            "AuthorName": {
-                "type": "string",
-                "index": "not_analyzed"
-            },
-            "AuthorEmail": {
-                "type": "string",
-                "index": "not_analyzed"
+    "mappings": {
+        "stock": {
+            "properties": {
+                "Timestamp": {
+                    "type": "date", 
+                    "format": "epoch_second"
+                },
+                "LineAgeVariance": {"type": "long"},
+                "LineAgeStandardDeviation": {"type": "long"},
+                "LineAgeMean": {"type": "long"},
+                "FirstCommitTimestamp": {
+                    "type": "date",
+                    "format": "epoch_second"
+                },
+                "LastCommitTimestamp": {
+                    "type": "date",
+                    "format": "epoch_second"
+                },
+                "LineCount": {"type": "long"},
+                "AuthorName": {
+                    "type": "string",
+                    "index": "not_analyzed"
+                },
+                "AuthorEmail": {
+                    "type": "string",
+                    "index": "not_analyzed"
+                }
             }
-        }
-    },
-    
-    "trees": {
-        "properties": {
-            "Timestamp": {
-                "type": "date", 
-                "format": "epoch_second"
-            },
-            "LineAgeVariance": {"type": "number"},
-            "LineAgeStandardDeviation": {"type": "number"},
-            "LineAgeMean": {"type": "number"},
-            "FirstCommitTimestamp": {
-                "type": "date",
-                "format": "epoch_second"
-            },
-            "LastCommitTimestamp": {
-                "type": "date",
-                "format": "epoch_second"
-            },
-            "LineCount": {"type": "number"},
-            "FileCount": {"type": "number"}
-        }
-    },
-    
-    "files": {
-        "properties": {
-            "Timestamp": {
-                "type": "date", 
-                "format": "epoch_second"
-            },
-            "LineAgeVariance": {"type": "number"},
-            "LineAgeStandardDeviation": {"type": "number"},
-            "LineAgeMean": {"type": "number"},
-            "FirstCommitTimestamp": {
-                "type": "date",
-                "format": "epoch_second"
-            },
-            "LastCommitTimestamp": {
-                "type": "date",
-                "format": "epoch_second"
-            },
-            "LineCount": {"type": "number"},
-            "FilePath": {
-                "type": "string",
-                "index": "not_analyzed"
+        },
+        
+        "tree": {
+            "properties": {
+                "Timestamp": {
+                    "type": "date", 
+                    "format": "epoch_second"
+                },
+                "LineAgeVariance": {"type": "long"},
+                "LineAgeStandardDeviation": {"type": "long"},
+                "LineAgeMean": {"type": "long"},
+                "FirstCommitTimestamp": {
+                    "type": "date",
+                    "format": "epoch_second"
+                },
+                "LastCommitTimestamp": {
+                    "type": "date",
+                    "format": "epoch_second"
+                },
+                "LineCount": {"type": "long"},
+                "FileCount": {"type": "long"}
             }
-        }
-    },
-    
-    "stock_files": {
-        "properties": {
-            "Timestamp": {
-                "type": "date", 
-                "format": "epoch_second"
-            },
-            "LineAgeVariance": {"type": "number"},
-            "LineAgeStandardDeviation": {"type": "number"},
-            "LineAgeMean": {"type": "number"},
-            "FirstCommitTimestamp": {
-                "type": "date",
-                "format": "epoch_second"
-            },
-            "LastCommitTimestamp": {
-                "type": "date",
-                "format": "epoch_second"
-            },
-            "LineCount": {"type": "number"},
-            "AuthorName": {
-                "type": "string",
-                "index": "not_analyzed"
-            },
-            "AuthorEmail": {
-                "type": "string",
-                "index": "not_analyzed"
-            },
-            "FilePath": {
-                "type": "string",
-                "index": "not_analyzed"
+        },
+        
+        "file": {
+            "properties": {
+                "Timestamp": {
+                    "type": "date", 
+                    "format": "epoch_second"
+                },
+                "LineAgeVariance": {"type": "long"},
+                "LineAgeStandardDeviation": {"type": "long"},
+                "LineAgeMean": {"type": "long"},
+                "FirstCommitTimestamp": {
+                    "type": "date",
+                    "format": "epoch_second"
+                },
+                "LastCommitTimestamp": {
+                    "type": "date",
+                    "format": "epoch_second"
+                },
+                "LineCount": {"type": "long"},
+                "FilePath": {
+                    "type": "string",
+                    "index": "not_analyzed"
+                }
+            }
+        },
+        
+        "stock-file": {
+            "properties": {
+                "Timestamp": {
+                    "type": "date", 
+                    "format": "epoch_second"
+                },
+                "LineAgeVariance": {"type": "long"},
+                "LineAgeStandardDeviation": {"type": "long"},
+                "LineAgeMean": {"type": "long"},
+                "FirstCommitTimestamp": {
+                    "type": "date",
+                    "format": "epoch_second"
+                },
+                "LastCommitTimestamp": {
+                    "type": "date",
+                    "format": "epoch_second"
+                },
+                "LineCount": {"type": "long"},
+                "AuthorName": {
+                    "type": "string",
+                    "index": "not_analyzed"
+                },
+                "AuthorEmail": {
+                    "type": "string",
+                    "index": "not_analyzed"
+                },
+                "FilePath": {
+                    "type": "string",
+                    "index": "not_analyzed"
+                }
+            }
+        },
+        
+        "commit": {
+            "properties": {
+                "Timestamp": {
+                    "type": "date",
+                    "format": "epoch_second"
+                },
+                "AuthorName": {
+                    "type": "string",
+                    "index": "not_analyzed"
+                },
+                "AuthorEmail": {
+                    "type": "string",
+                    "index": "not_analyzed"
+                },
+                "DayOfTheWeek": {
+                    "type": "string",
+                    "index": "not_analyzed"
+                },
+                "HourOfTheDay": {"type": "long"},
+                "Message": {"type": "string"}
+            }
+        },
+        
+        "commit-day": {
+            "properties": {
+                "Timestamp": {
+                    "type": "date",
+                    "format": "epoch_second"
+                },
+                "CommitCount": {"type": "long"}
             }
         }
     }
