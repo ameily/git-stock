@@ -147,8 +147,8 @@ int parseArgs(int argc, char **argv, bool& shouldExit) {
         if(opts.destination.empty()) {
             cerr << argv[0] << ": missing required argument -o/--output.\n";
             return 1;
-        } else if(!isDirectory(opts.destination)) {
-            cerr << argv[0] << ": output path must be a directory when perform history analysis\n";
+        } else if(!isFileOrNotExist(opts.destination)) {
+            cerr << argv[0] << ": output path must be a regular file when perform history analysis\n";
             return 1;
         }
     } else if(!opts.destination.empty() && !isFileOrNotExist(opts.destination)) {
