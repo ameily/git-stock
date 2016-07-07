@@ -45,7 +45,8 @@ public:
         name = basename(path.c_str());
 
         git_tree_walk(tree, GIT_TREEWALK_PRE, treeMetricsCallback, &state);
-
+        
+        stocks.calculateOwnership(lineMetrics.lineCount().get_si());
         stocks.sort();
     }
     
@@ -61,6 +62,7 @@ public:
         lineMetrics.updateLineAgeMetrics(*metrics);
 
         stocks.update(metrics->stocks());
+        stocks.calculateOwnership(metrics->lineCount().get_si());
     }
 };
 

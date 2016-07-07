@@ -23,6 +23,8 @@ public:
 
     const std::string& name() const;
     const std::string& email() const;
+    double ownership() const;
+    void calculateOwnership(int totalLineCount);
 
     void update(const Stock& other);
 
@@ -52,6 +54,7 @@ public:
     void update(const StockCollection& other);
     
     Json::Value toJson(const mpz_class& offset = 0) const;
+    void calculateOwnership(int totalLineCount);
 
 private:
     StockCollectionImpl *pImpl;

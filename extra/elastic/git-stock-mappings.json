@@ -25,7 +25,8 @@
                 "AuthorEmail": {
                     "type": "string",
                     "index": "not_analyzed"
-                }
+                },
+                "Ownership": {"type": "double"}
             }
         },
         
@@ -105,7 +106,8 @@
                 "FilePath": {
                     "type": "string",
                     "index": "not_analyzed"
-                }
+                },
+                "Ownership": {"type": "double"}
             }
         },
         

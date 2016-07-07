@@ -20,9 +20,10 @@ class StockImpl {
 public:
     string email;
     string name;
+    double ownership;
 
     StockImpl(const git_signature *sig)
-        : email(sig->email), name(sig->name) {
+        : email(sig->email), name(sig->name), ownership(0) {
     }
 
     StockImpl(const string& email, const string& name)
@@ -41,6 +42,15 @@ Stock::Stock(const string& email, const string& name)
 Stock::~Stock() {
     delete pImpl;
 }
+
+double Stock::ownership() const {
+    return pImpl->ownership;
+}
+
+void Stock::calculateOwnership(int totalLineCount) {
+    pImpl->ownership = lineCount().get_d() / (double)totalLineCount;
+}
+
 
 const string& Stock::email() const {
     return pImpl->email;
@@ -64,6 +74,7 @@ Json::Value Stock::toJson(const mpz_class& offset) const {
     LineAgeMetrics::toJson(json, offset);
     json["AuthorName"] = pImpl->name;
     json["AuthorEmail"] = pImpl->email;
+    json["Ownership"] = pImpl->ownership;
     json["_type"] = "stock";
     
     return json;
@@ -149,6 +160,13 @@ void StockCollection::update(const StockCollection& other) {
 void StockCollection::sort() {
     pImpl->sort();
 }
+
+void StockCollection::calculateOwnership(int totalLineCount) {
+    for(Stock *stock : pImpl->collection) {
+        stock->calculateOwnership(totalLineCount);
+    }
+}
+
 
 Json::Value StockCollection::toJson(const mpz_class& offset) const {
     Json::Value json(Json::arrayValue);
