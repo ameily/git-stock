@@ -86,7 +86,7 @@ mpz_class LineAgeMetrics::lineAgeMean(const mpz_class& offset) const {
 		//       = -a - b - c + 3(offset)
 		//       = 3(offset) - sum
 		//
-		sum = (pImpl->count * offset) - pImpl->sum;
+		sum = (offset * pImpl->count) - pImpl->sum;
 	} else {
 		sum = pImpl->sum;
 	}
@@ -172,7 +172,7 @@ void LineAgeMetrics::toJson(Json::Value& json, const mpz_class& offset) const {
     json["LastCommitTimestamp"] = (Json::UInt64)pImpl->lastCommitTimestamp.get_ui();
     json["LineAgeVariance"] = (Json::UInt64)lineAgeVariance(offset).get_ui();
     json["LineAgeStandardDeviation"] = (Json::UInt64)lineAgeStandardDeviation(offset).get_ui();
-    json["LineAgeMean"] = (Json::UInt64)(offset).get_ui();
+    json["LineAgeMean"] = (Json::UInt64)lineAgeMean(offset).get_ui();
 }
 
 
