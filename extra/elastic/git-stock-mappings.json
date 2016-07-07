@@ -127,7 +127,10 @@
                     "type": "string",
                     "index": "not_analyzed"
                 },
-                "HourOfTheDay": {"type": "long"},
+                "HourOfTheDay": {
+                    "type": "string",
+                    "index": "not_analyzed"
+                },
                 "Message": {"type": "string"}
             }
         },
@@ -138,7 +141,8 @@
                     "type": "date",
                     "format": "epoch_second"
                 },
-                "CommitCount": {"type": "long"}
+                "CommitCount": {"type": "long"},
+                "TotalCommitCount": {"type": "long"}
             }
         }
     }

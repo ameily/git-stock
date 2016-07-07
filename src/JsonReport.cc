@@ -36,6 +36,7 @@
 #include <fstream>
 #include <mutex>
 #include <errno.h>
+#include <sstream>
 
 using namespace std;
 
@@ -44,14 +45,16 @@ namespace gitstock {
 
 namespace {
 const static string *WEEK_DAY_NAMES = new string[7] {
-    "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
+    "0 - Sunday", "1 - Monday", "2 - Tuesday", "3 - Wednesday", "4 - Thursday", "5 - Friday", "6 - Saturday"
 };
 
-string getWeekDayName(int wday) {
-    stringstream ss;
-    ss << wday << " " << WEEK_DAY_NAMES[wday];
-    return ss.str();
-}
+const static string *HOUR_NAMES = new string[24] {
+    "00 (12am)", "01 (1am)", "02 (2am)", "03 (3am)", "04 (4am)", "05 (5am)",
+    "06 (6am)", "07 (7am)", "08 (8am)", "09 (9am)", "10 (10am)", "11 (11am)",
+    "12 (12pm)", "13 (1pm)", "14 (2pm)", "15 (3pm)", "16 (4pm)", "17 (5pm)",
+    "18 (6pm)", "19 (7pm)", "20 (8pm)", "21 (9pm)", "22 (10pm)", "23 (11pm)"
+};
+
 }
 
 class JsonReportImpl {
@@ -101,13 +104,12 @@ public:
         unique_lock<mutex> lock(streamLock);
         mpz_class offset = opts.nowTimestamp ? opts.nowTimestamp : metrics->lastCommitTimestamp();
         Json::Value treeJson = metrics->toJson(offset);
-        Json::Value dayJson = dayToJson(day);
+        Json::Value dayJson = day->toJson();
         
         writer->write(dayJson, &stream);
         stream << "\n";
         writer->write(normalize(day, treeJson), &stream);
         stream << "\n";
-        //tree << "\n";
         
         for(const FileMetrics *file : *metrics) {
             Json::Value fileJson = file->toJson(offset);
@@ -130,20 +132,10 @@ public:
         }
         
         for(git_commit *commit : day->commits()) {
-            //TODO
             Json::Value json = commitToJson(commit);
             writer->write(json, &stream);
             stream << "\n";
         }
-    }
-    
-    Json::Value dayToJson(const CommitDay *day) {
-        Json::Value json(Json::objectValue);
-        json["_type"] = "commit-day";
-        json["Timestamp"] = (Json::Int64)day->timestamp();
-        json["CommitCount"] = (Json::Int)day->commits().size();
-        
-        return json;
     }
     
     Json::Value commitToJson(git_commit *commit) const {
@@ -155,8 +147,8 @@ public:
         
         json["Message"] = msg ? msg : ""; //git_commit_body(commit);
         json["Timestamp"] = (Json::Int64)timestamp;
-        json["DayOfTheWeek"] = getWeekDayName(t->tm_wday);
-        json["HourOfTheDay"] = t->tm_hour;
+        json["DayOfTheWeek"] = WEEK_DAY_NAMES[t->tm_wday];
+        json["HourOfTheDay"] = HOUR_NAMES[t->tm_hour];
         json["_type"] = "commit";
         
         if(sig) {

@@ -93,14 +93,22 @@ public:
     }
     
     void build(TimelineBuilder& builder) {
+        int totalCount = 0;
         for(int64_t timestamp : builder.days) {
             vector<git_commit*>& commits = builder.commitDays[timestamp];
             CommitDay *day = new CommitDay(timestamp, commits);
+            
+            totalCount += commits.size();
+            day->totalCommitCount(totalCount);
             
             timeline.push_back(day);
             
             commits.clear();
         }
+        
+        // We process the days in reverse order. This way we don't run into
+        // problems when performing git blame which references a previously 
+        // cached commit
         reverse(timeline.begin(), timeline.end());
     }
     
@@ -179,9 +187,11 @@ public:
     int64_t timestamp;
     vector<git_commit*> commits;
     bool isPendingRelease;
+    int totalCommitCount;
     
     CommitDayImpl(int64_t timestamp, const vector<git_commit*>& commits)
-        : timestamp(timestamp), commits(commits), isPendingRelease(false) {
+        : timestamp(timestamp), commits(commits), isPendingRelease(false),
+        totalCommitCount(0) {
         sort(this->commits.begin(), this->commits.end(), compareCommits);
     }
     
@@ -236,6 +246,25 @@ bool CommitDay::isPendingRelease() const {
 void CommitDay::release() {
     pImpl->isPendingRelease = true;
 }
+
+int CommitDay::totalCommitCount() const {
+    return pImpl->totalCommitCount;
+}
+
+void CommitDay::totalCommitCount(int count) {
+    pImpl->totalCommitCount = count;
+}
+
+Json::Value CommitDay::toJson() const {
+    Json::Value json(Json::objectValue);
+    json["_type"] = "commit-day";
+    json["Timestamp"] = (Json::Int64)pImpl->timestamp;
+    json["CommitCount"] = (Json::Int)pImpl->commits.size();
+    json["TotalCommitCount"] = pImpl->totalCommitCount;
+    
+    return json;
+}
+
 
 
 

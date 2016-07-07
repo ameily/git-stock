@@ -33,6 +33,7 @@
 #include <vector>
 #include <string>
 #include <stdint.h>
+#include <jsoncpp/json/json.h>
 
 namespace gitstock {
 
@@ -48,12 +49,17 @@ public:
     std::string shortDay() const;
     int64_t timestamp() const;
     const std::vector<git_commit*>& commits() const;
+
+    int totalCommitCount() const;
+    void totalCommitCount(int count);
     
     std::vector<git_commit*>::const_iterator begin() const;
     std::vector<git_commit*>::const_iterator end() const;
     
     bool isPendingRelease() const;
     void release();
+    
+    Json::Value toJson() const;
     
 private:
     CommitDayImpl *pImpl;
