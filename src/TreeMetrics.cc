@@ -31,7 +31,7 @@ public:
     StockCollection stocks;
     string name;
     string path;
-
+    int64_t timestamp;
 
     TreeMetricsImpl(LineAgeMetrics& lineMetrics, const string& path, const git_tree *tree, const git_commit *newestCommit)
         : lineMetrics(lineMetrics), fileCount(0), path(path) {
@@ -48,6 +48,8 @@ public:
 
         stocks.calculateOwnership(lineMetrics.lineCount().get_si());
         stocks.sort();
+
+        timestamp = newestCommit ? getDayTimestamp(newestCommit) : 0;
     }
 
     ~TreeMetricsImpl() {
@@ -117,28 +119,6 @@ int treeMetricsCallback(const char *root, const git_tree_entry *entry, void *pay
         if(!Options.shouldIgnorePath(path) && isTextBlob(git_tree_owner(state->tree), entry)) {
 			FileMetrics *metrics = new FileMetrics(state->tree, path, state->newestCommit);
 			state->pImpl->update(metrics);
-			/*
-			cout << path << "\n"
-				<< "  Count:   " << metrics->lineMetrics().count() << "\n"
-				<< "  Sum:     " << metrics->lineMetrics().sum() << "\n"
-				<< "  SqSum:   " << metrics->lineMetrics().sqsum() << "\n"
-				<< "  Mean:    " << metrics->lineMetrics().mean() << "\n"
-				<< "  First:   " << metrics->lineMetrics().firstCommitTimestamp() << "\n"
-				<< "  Last:    " << metrics->lineMetrics().lastCommitTimestamp() << "\n"
-				<< "  Sum_2:   " << metrics->lineMetrics().localSum() << "\n"
-				<< "  SqSum_2: " << metrics->lineMetrics().localSqsum() << "\n"
-				// (pImpl->sqsum - (2 * offset * pImpl->sum)) + (pImpl->count * offset * offset)
-				<< "  count * offset * offset: " << (metrics->lineMetrics().count() * metrics->lineMetrics().lastCommitTimestamp() * metrics->lineMetrics().lastCommitTimestamp()) << "\n"
-				<< "  2 * offset * sum: " << (2 * metrics->lineMetrics().lastCommitTimestamp() * metrics->lineMetrics().sum()) << "\n"
-				<< "  count * offset * offset: " << (metrics->lineMetrics().count() * metrics->lineMetrics().lastCommitTimestamp() * metrics->lineMetrics().lastCommitTimestamp()) << "\n"
-				<< "  Last:    " << metrics->lineMetrics().lastCommitTimestamp() << "\n"
-				<< "  Count:   " << metrics->lineMetrics().count() << "\n"
-				<< "  Mean_2:  " << metrics->lineMetrics().localMean() << "\n"
-				<< "           " << formatDuration(metrics->lineMetrics().localMean()) << "\n"
-				<< "  StdDev:  " << formatDuration(metrics->lineMetrics().localStandardDeviation()) << "\n\n";
-				*/
-			//cout << path << ": " << formatDuration(metrics->lineMetrics().localMean())
-			//	<< " -> " << formatDuration(metrics->lineMetrics().localStandardDeviation()) << "\n";
 		}
     }
 
@@ -153,10 +133,15 @@ const string& TreeMetrics::name() const {
     return pImpl->name;
 }
 
+int64_t TreeMetrics::timestamp() const {
+    return pImpl->timestamp;
+}
+
 Json::Value TreeMetrics::toJson(const mpz_class& offset) const {
     Json::Value json;
     LineAgeMetrics::toJson(json, offset);
     json["FileCount"] = pImpl->fileCount;
+    json["Timestamp"] = (Json::Int64)pImpl->timestamp;
     json["_type"] = "tree";
     //Json::Value& files = json["files"] = Json::arrayValue;
 

@@ -28,8 +28,10 @@ public:
 
     std::vector<FileMetrics*>::const_iterator begin() const;
     std::vector<FileMetrics*>::const_iterator end() const;
-    
+
     Json::Value toJson(const mpz_class& offset = 0) const;
+
+    int64_t timestamp() const;
 
 private:
     TreeMetricsImpl *pImpl;

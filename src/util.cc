@@ -1,5 +1,6 @@
 
 #include "util.hh"
+#include <git2/commit.h>
 #include <sstream>
 #include <iomanip>
 
@@ -7,18 +8,19 @@
 using namespace std;
 
 namespace gitstock {
-	
+
 namespace {
 
 static const mpz_class YEAR_SECONDS(31536000);
 static const mpz_class DAY_SECONDS(86400);
 static const mpz_class HOUR_SECONDS(3600);
+static const int64_t SECONDS_PER_DAY = 86400; // seconds in a day
 
 }
 
 string formatDuration(mpz_class duration) {
     stringstream ss;
-    
+
     if(duration == 0) {
 		return "0";
 	}
@@ -59,6 +61,11 @@ string formatPercent(double value) {
     stringstream ss;
     ss << fixed << setprecision(2) << (value * 100.0) << "%";
     return ss.str();
+}
+
+int64_t getDayTimestamp(const git_commit *commit) {
+	int64_t timestamp = git_commit_time(commit);
+	return timestamp - (timestamp % SECONDS_PER_DAY);
 }
 
 

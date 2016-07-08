@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2016, <copyright holder> <email>
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *     * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
  *     * Neither the name of the <organization> nor the
  *     names of its contributors may be used to endorse or promote products
  *     derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY <copyright holder> <email> ''AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -23,11 +23,12 @@
  * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- * 
+ *
  */
 
 #include "CommitTimeline.hh"
 #include "GitStockLog.hh"
+#include "util.hh"
 #include <set>
 #include <unordered_map>
 #include <algorithm>
@@ -40,8 +41,7 @@ using namespace std;
 
 namespace gitstock {
 
-static GitStockLog logger = GitStockLog::getLogger();    
-static const int64_t SECONDS_PER_DAY = 86400; // seconds in a day
+static GitStockLog logger = GitStockLog::getLogger();
 
 struct TimelineBuilder {
     set<string> knownCommits;
@@ -59,74 +59,73 @@ public:
     mutex timelineMutex;
     int popIndex;
     int releaseIndex;
-    
+
     CommitTimelineImpl(git_commit *head) : commits(0), popIndex(0), releaseIndex(0) {
         TimelineBuilder builder;
         addCommit(head, builder);
         build(builder);
     }
-    
+
     ~CommitTimelineImpl() {
-        
+
     }
-    
+
     void addCommit(git_commit *commit, TimelineBuilder& builder) {
         string id((const char*)git_commit_id(commit)->id, 20);
         auto result = builder.knownCommits.insert(id);
         if(result.second) {
-            int64_t timestamp = git_commit_time(commit);
-            int64_t day = timestamp - (timestamp % SECONDS_PER_DAY);
+            int64_t day = getDayTimestamp(commit);
             unsigned int parents = git_commit_parentcount(commit);
-            
+
             ++commits;
-            
+
             builder.commitDays[day].push_back(commit);
             builder.days.insert(day);
 
             for(unsigned int index = 0; index < parents; ++index) {
                 git_commit *parent;
                 git_commit_parent(&parent, commit, index);
-                
+
                 addCommit(parent, builder);
             }
         }
     }
-    
+
     void build(TimelineBuilder& builder) {
         int totalCount = 0;
         for(int64_t timestamp : builder.days) {
             vector<git_commit*>& commits = builder.commitDays[timestamp];
             CommitDay *day = new CommitDay(timestamp, commits);
-            
+
             totalCount += commits.size();
             day->totalCommitCount(totalCount);
-            
+
             timeline.push_back(day);
-            
+
             commits.clear();
         }
-        
+
         // We process the days in reverse order. This way we don't run into
-        // problems when performing git blame which references a previously 
+        // problems when performing git blame which references a previously
         // cached commit
         reverse(timeline.begin(), timeline.end());
     }
-    
+
     CommitDay* pop() {
         unique_lock<mutex> lock(timelineMutex);
         CommitDay *day;
         if(popIndex < timeline.size()) {
             day = timeline[popIndex];
             ++popIndex;
-            
+
             //cout << "Processing day: " << day->date() << " (" << day->commits().size() << ")\n";
         } else {
             day = nullptr;
         }
-        
+
         return day;
     }
-    
+
     void release(CommitDay *day) {
         unique_lock<mutex> lock(timelineMutex);
         day->release();
@@ -141,9 +140,9 @@ public:
             }
         }
     }
-};    
+};
 
-    
+
 CommitTimeline::CommitTimeline(git_commit *head)
     : pImpl(new CommitTimelineImpl(head)) {
 }
@@ -188,13 +187,13 @@ public:
     vector<git_commit*> commits;
     bool isPendingRelease;
     int totalCommitCount;
-    
+
     CommitDayImpl(int64_t timestamp, const vector<git_commit*>& commits)
         : timestamp(timestamp), commits(commits), isPendingRelease(false),
         totalCommitCount(0) {
         sort(this->commits.begin(), this->commits.end(), compareCommits);
     }
-    
+
     ~CommitDayImpl() {
         for(git_commit *commit : commits) {
             git_commit_free(commit);
@@ -261,7 +260,7 @@ Json::Value CommitDay::toJson() const {
     json["Timestamp"] = (Json::Int64)pImpl->timestamp;
     json["CommitCount"] = (Json::Int)pImpl->commits.size();
     json["TotalCommitCount"] = pImpl->totalCommitCount;
-    
+
     return json;
 }
 
