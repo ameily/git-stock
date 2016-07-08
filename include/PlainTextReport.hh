@@ -14,7 +14,6 @@ public:
     virtual ~PlainTextReport();
 
     void report(const TreeMetrics& tree);
-
 };
 
 }

@@ -284,15 +284,16 @@ int runHistory(git_commit *commit) {
 int runSingle(git_commit *commit) {
     git_tree *tree;
     TreeMetrics *metrics;
-    PlainTextReport report;
 
     git_commit_tree(&tree, commit);
     metrics = new TreeMetrics(Options.repoPath, tree, commit);
 
-    report.report(*metrics);
-
 	if(Options.json) {
-
+		JsonReport report;
+		report.report(*metrics);
+	} else {
+		PlainTextReport report;
+		report.report(*metrics);
 	}
 
     //delete metrics;
