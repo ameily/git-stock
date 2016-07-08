@@ -15,25 +15,31 @@ public:
 	std::string refName;
 	std::vector<std::string> excludePatterns;
 	bool useMailMapFile;
-	bool verbose;
+	int verbose;
 	uint64_t nowTimestamp;
     int threads;
     std::string destination;
     bool pretty;
     bool history;
+	bool json;
     std::pair<std::string, std::string> resolveSignature(const std::string& email, const std::string& name) const;
-	
-	static GitStockOptions& get();
-	
+	std::ostream *output;
+
+	//static GitStockOptions& get();
+
 	bool shouldIgnorePath(const std::string& path) const;
-    
+
     void loadMailMap(const std::string& path);
-	
-private:
-	GitStockOptions();
+
+	static void initialize();
+
+//private:
+//	GitStockOptions();
+
 };
+
+extern GitStockOptions Options;
 
 }
 
 #endif
-

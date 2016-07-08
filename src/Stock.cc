@@ -70,13 +70,13 @@ void Stock::update(const Stock& other) {
 
 Json::Value Stock::toJson(const mpz_class& offset) const {
     Json::Value json;
-    
+
     LineAgeMetrics::toJson(json, offset);
     json["AuthorName"] = pImpl->name;
     json["AuthorEmail"] = pImpl->email;
     json["Ownership"] = pImpl->ownership;
     json["_type"] = "stock";
-    
+
     return json;
 }
 
@@ -93,7 +93,7 @@ public:
 
     Stock& find(const string& email, const string& name) {
         Stock *stock = nullptr;
-        pair<string, string> resolved = GitStockOptions::get().resolveSignature(email, name);
+        pair<string, string> resolved = Options.resolveSignature(email, name);
 
         for(auto i = collection.begin(); i != collection.end() && !stock; ++i) {
             if((*i)->email() == resolved.first) {
@@ -173,7 +173,7 @@ Json::Value StockCollection::toJson(const mpz_class& offset) const {
     for(const Stock *stock : pImpl->collection) {
         json.append(stock->toJson(offset));
     }
-    
+
     return json;
 }
 

@@ -45,11 +45,11 @@ public:
         name = basename(path.c_str());
 
         git_tree_walk(tree, GIT_TREEWALK_PRE, treeMetricsCallback, &state);
-        
+
         stocks.calculateOwnership(lineMetrics.lineCount().get_si());
         stocks.sort();
     }
-    
+
     ~TreeMetricsImpl() {
         for(FileMetrics *metrics : files) {
             delete metrics;
@@ -109,12 +109,12 @@ bool isTextBlob(git_repository *repo, const git_tree_entry *entry) {
 int treeMetricsCallback(const char *root, const git_tree_entry *entry, void *payload) {
     if(git_tree_entry_type(entry) == GIT_OBJ_BLOB) {
         TreeWalkState *state = (TreeWalkState*)payload;
-        GitStockOptions& opts = GitStockOptions::get();
+
         string path = root;
 
 		path += git_tree_entry_name(entry);
 
-        if(!opts.shouldIgnorePath(path) && isTextBlob(git_tree_owner(state->tree), entry)) {
+        if(!Options.shouldIgnorePath(path) && isTextBlob(git_tree_owner(state->tree), entry)) {
 			FileMetrics *metrics = new FileMetrics(state->tree, path, state->newestCommit);
 			state->pImpl->update(metrics);
 			/*
@@ -159,9 +159,9 @@ Json::Value TreeMetrics::toJson(const mpz_class& offset) const {
     json["FileCount"] = pImpl->fileCount;
     json["_type"] = "tree";
     //Json::Value& files = json["files"] = Json::arrayValue;
-    
+
     return json;
-    
+
 }
 
 

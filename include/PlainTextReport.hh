@@ -12,15 +12,12 @@ class PlainTextReport {
 public:
     PlainTextReport();
     virtual ~PlainTextReport();
-    
-    void report(std::ostream& os, const TreeMetrics& tree);
-    
+
+    void report(const TreeMetrics& tree);
+
 };
 
 }
 
 
 #endif
-
-
-

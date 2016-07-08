@@ -11,6 +11,8 @@ using namespace std;
 
 namespace gitstock {
 
+GitStockOptions Options;
+
 namespace {
 GitStockOptions *__options = nullptr;
 struct MailMapEntry {
@@ -27,7 +29,7 @@ list<string> split(const string& str, const string& seps) {
     list<string> strs;
     for(int i = 0; i < str.length(); ++i) {
         char c = str[i];
-        
+
         if(seps.find(c) != string::npos) {
             if(start >= 0) {
                 strs.push_back(str.substr(start, i));
@@ -39,11 +41,11 @@ list<string> split(const string& str, const string& seps) {
             start = i;
         }
     }
-    
+
     if(start >= 0) {
         strs.push_back(str.substr(start));
     }
-    
+
     return strs;
 }
 
@@ -55,34 +57,34 @@ void parseMailmap(const string& path) {
     //
     ifstream stream;
     stream.open(path, ios::in);
-    
+
     while(!stream.eof()) {
         string line;
         string srcName, srcEmail, destName, destEmail;
         list<string> parts;
-        
+
         getline(stream, line);
         parts = split(line, " \t\r\n");
-        
+
         for(string part : parts) {
             if(part[0] == '<') {
                 int end = part.length() - 1;
                 if(part[end] == '>') {
                     --end;
                 }
-                
+
                 if(srcName.empty() && destEmail.empty()) {
                     destEmail = part.substr(1, end);
                 } else {
                     MailMapEntry *entry = new MailMapEntry();
-                    
+
                     srcEmail = part.substr(1, end);
-                    
+
                     entry->srcName = srcName;
                     entry->srcEmail = srcEmail;
                     entry->destName = destName;
                     entry->destEmail = destEmail;
-                    
+
                     mailmap.push_back(entry);
                     break;
                 }
@@ -98,36 +100,53 @@ void parseMailmap(const string& path) {
 }
 
 }
-
+/*
 GitStockOptions& GitStockOptions::get() {
 	if(!__options) {
 		__options = new GitStockOptions();
 		__options->refName = "HEAD";
 		__options->useMailMapFile = false;
-		__options->verbose = false;
+		__options->verbose = 0;
 		__options->nowTimestamp = 0;
         __options->threads = 4;
         __options->destination = "";
         __options->pretty = false;
         __options->history = false;
+        __options->json = false;
+        __options->output = &cout;
 	}
 	return *__options;
 }
+*/
 
-GitStockOptions::GitStockOptions() {
-	char path[PATH_MAX];
+void GitStockOptions::initialize() {
+    char path[PATH_MAX];
 	getcwd(path, PATH_MAX);
-	
-	repoPath = path;
-}
 
+	Options.repoPath = path;
+    Options.refName = "HEAD";
+    Options.useMailMapFile = false;
+    Options.verbose = 0;
+    Options.nowTimestamp = 0;
+    Options.threads = 4;
+    Options.destination = "";
+    Options.pretty = false;
+    Options.history = false;
+    Options.json = false;
+    Options.output = &cout;
+}
+/*
+GitStockOptions::GitStockOptions() {
+
+}
+*/
 bool GitStockOptions::shouldIgnorePath(const string& path) const {
 	for(const string& pattern : excludePatterns) {
 		if(!fnmatch(pattern.c_str(), path.c_str(), 0)) {
 			return true;
 		}
 	}
-	
+
 	return false;
 }
 
@@ -138,7 +157,7 @@ pair<string, string> GitStockOptions::resolveSignature(const string& email, cons
                 if(entry->destName.empty()) {
                     entry->destName = name;
                 }
-                
+
                 return make_pair(entry->destEmail, entry->destName);
             }
         }
@@ -152,5 +171,3 @@ void GitStockOptions::loadMailMap(const string& path) {
 }
 
 }
-
-

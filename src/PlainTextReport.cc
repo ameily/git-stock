@@ -16,9 +16,9 @@ PlainTextReport::PlainTextReport() {
 PlainTextReport::~PlainTextReport() {
 }
 
-void PlainTextReport::report(ostream& os, const TreeMetrics& tree) {
-    GitStockOptions& opts = GitStockOptions::get();
-    mpz_class offset = opts.nowTimestamp ? opts.nowTimestamp : tree.lastCommitTimestamp();
+void PlainTextReport::report(const TreeMetrics& tree) {
+    ostream& os = *Options.output;
+    mpz_class offset = Options.nowTimestamp ? Options.nowTimestamp : tree.lastCommitTimestamp();
     // overall
     os << tree.name() << "\n"
         << "========================================================\n"
@@ -60,7 +60,7 @@ void PlainTextReport::report(ostream& os, const TreeMetrics& tree) {
         << "\n";
 
     for(FileMetrics *file : tree) {
-        mpz_class fileOffset = opts.nowTimestamp ? opts.nowTimestamp : file->lastCommitTimestamp();
+        mpz_class fileOffset = Options.nowTimestamp ? Options.nowTimestamp : file->lastCommitTimestamp();
         int stockCount = 0;
 
         if(!file->lineCount()) {
