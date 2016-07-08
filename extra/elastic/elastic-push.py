@@ -5,6 +5,7 @@ import json
 from elasticsearch import Elasticsearch
 import elasticsearch.helpers
 import sys
+import os
 
 
 def _prefix(s):
@@ -112,13 +113,17 @@ if __name__ == "__main__":
     parser.add_argument('-i', '--index', help='elastic index', action='store')
     parser.add_argument('-f', '--file', help='json file to push', action='store')
 
-    progress = ProgressBar(stream=sys.stdout, count=size, width=80,
-                           activity="Pushing objects to Elasticsearch")
+    #progress = ProgressBar(stream=sys.stdout, count=size, width=80,
+    #                       activity="Pushing objects to Elasticsearch")
 
     args = parser.parse_args()
 
     es = Elasticsearch(hosts=[args.url])
     size = os.path.getsize(args.file)
+
+    progress = ProgressBar(stream=sys.stdout, count=size, width=80,
+                           activity="Pushing objects to Elasticsearch")
+
     fp = open(args.file, 'r')
     success, errors = elasticsearch.helpers.bulk(
         es, bulk_wrapper(fp, args.index, progress),
