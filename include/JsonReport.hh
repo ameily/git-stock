@@ -43,7 +43,8 @@ public:
     JsonReport();
     ~JsonReport();
 
-    void report(const CommitDay *day, const TreeMetrics *metrics);
+    void report(const CommitDay& day);
+    void report(const TreeMetrics& metrics);
 
 private:
     JsonReportImpl *pImpl;

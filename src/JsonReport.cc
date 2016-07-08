@@ -71,48 +71,50 @@ public:
     }
 
 
-    Json::Value& normalize(const CommitDay *day, Json::Value& json) {
-        json["Timestamp"] = (Json::Int64)day->timestamp();
+    Json::Value& normalize(int64_t timestamp, Json::Value& json) {
+        json["Timestamp"] = (Json::Int64)timestamp;
         return json;
     }
 
-    void report(const CommitDay *day, const TreeMetrics *metrics) {
-        // files
-        // tree.json => tree information
-        // stocks.json => stock information
-        // files.json => file information
-        // stock_files.json => stocks within files information
+    void report(const TreeMetrics& tree) {
         unique_lock<mutex> lock(streamLock);
-        mpz_class offset = Options.nowTimestamp ? Options.nowTimestamp : metrics->lastCommitTimestamp();
-        Json::Value treeJson = metrics->toJson(offset);
-        Json::Value dayJson = day->toJson();
+        ostream& stream = *Options.output;
+        mpz_class offset = Options.nowTimestamp ? Options.nowTimestamp : tree.lastCommitTimestamp();
+        Json::Value treeJson = tree.toJson(offset);
 
-        writer->write(dayJson, &stream);
-        stream << "\n";
-        writer->write(normalize(day, treeJson), &stream);
+        writer->write(treeJson, &stream);
         stream << "\n";
 
-        for(const FileMetrics *file : *metrics) {
+        for(const FileMetrics *file : tree) {
             Json::Value fileJson = file->toJson(offset);
-            writer->write(normalize(day, fileJson), &stream);
+            writer->write(normalize(tree.timestamp(), fileJson), &stream);
             stream << "\n";
 
             for(const Stock *stock : file->stocks()) {
                 Json::Value stockJson = stock->toJson(offset);
                 stockJson["FilePath"] = file->path();
                 stockJson["_type"] = "stock-file";
-                writer->write(normalize(day, stockJson), &stream);
+                writer->write(normalize(tree.timestamp(), stockJson), &stream);
                 stream << "\n";
             }
         }
 
-        for(const Stock* stock : metrics->stocks()) {
+        for(const Stock* stock : tree.stocks()) {
             Json::Value stockJson = stock->toJson(offset);
-            writer->write(normalize(day, stockJson), &stream);
+            writer->write(normalize(tree.timestamp(), stockJson), &stream);
             stream << "\n";
         }
+    }
 
-        for(git_commit *commit : day->commits()) {
+    void report(const CommitDay& day) {
+        unique_lock<mutex> lock(streamLock);
+        ostream& stream = *Options.output;
+        Json::Value dayJson = day.toJson();
+
+        writer->write(dayJson, &stream);
+        stream << "\n";
+
+        for(git_commit *commit : day.commits()) {
             Json::Value json = commitToJson(commit);
             writer->write(json, &stream);
             stream << "\n";
@@ -149,10 +151,13 @@ JsonReport::~JsonReport() {
     delete pImpl;
 }
 
-void JsonReport::report(const CommitDay* day, const TreeMetrics* metrics) {
-    pImpl->report(day, metrics);
+void JsonReport::report(const CommitDay& day) {
+    pImpl->report(day);
 }
 
+void JsonReport::report(const TreeMetrics& tree) {
+    pImpl->report(tree);
+}
 
 
 }

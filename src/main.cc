@@ -242,7 +242,8 @@ void historyWorker(CommitTimeline *timeline, JsonReport& report) {
         }
 
         //writeOutput(Options.destination, day, metrics);
-        report.report(day, metrics);
+        report.report(*day);
+		report.report(*metrics);
 
         delete metrics;
         timeline->release(day);
