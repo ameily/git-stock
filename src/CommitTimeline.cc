@@ -256,10 +256,21 @@ void CommitDay::totalCommitCount(int count) {
 
 Json::Value CommitDay::toJson() const {
     Json::Value json(Json::objectValue);
+    double commitWindow;
+
     json["_type"] = "commit-day";
     json["Timestamp"] = (Json::Int64)pImpl->timestamp;
     json["CommitCount"] = (Json::Int)pImpl->commits.size();
     json["TotalCommitCount"] = pImpl->totalCommitCount;
+
+    if(pImpl->commits.size() > 1) {
+        commitWindow = (git_commit_time(pImpl->commits.back()) -
+                        git_commit_time(pImpl->commits.front())) / 3600.0;
+    } else {
+        commitWindow = 0.0;
+    }
+    json["CommitSpanHours"] = commitWindow;
+
 
     return json;
 }

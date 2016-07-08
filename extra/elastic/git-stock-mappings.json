@@ -3,7 +3,7 @@
         "stock": {
             "properties": {
                 "Timestamp": {
-                    "type": "date", 
+                    "type": "date",
                     "format": "epoch_second"
                 },
                 "LineAgeVariance": {"type": "long"},
@@ -29,11 +29,11 @@
                 "Ownership": {"type": "double"}
             }
         },
-        
+
         "tree": {
             "properties": {
                 "Timestamp": {
-                    "type": "date", 
+                    "type": "date",
                     "format": "epoch_second"
                 },
                 "LineAgeVariance": {"type": "long"},
@@ -51,11 +51,11 @@
                 "FileCount": {"type": "long"}
             }
         },
-        
+
         "file": {
             "properties": {
                 "Timestamp": {
-                    "type": "date", 
+                    "type": "date",
                     "format": "epoch_second"
                 },
                 "LineAgeVariance": {"type": "long"},
@@ -76,11 +76,11 @@
                 }
             }
         },
-        
+
         "stock-file": {
             "properties": {
                 "Timestamp": {
-                    "type": "date", 
+                    "type": "date",
                     "format": "epoch_second"
                 },
                 "LineAgeVariance": {"type": "long"},
@@ -110,7 +110,7 @@
                 "Ownership": {"type": "double"}
             }
         },
-        
+
         "commit": {
             "properties": {
                 "Timestamp": {
@@ -136,7 +136,7 @@
                 "Message": {"type": "string"}
             }
         },
-        
+
         "commit-day": {
             "properties": {
                 "Timestamp": {
@@ -144,7 +144,8 @@
                     "format": "epoch_second"
                 },
                 "CommitCount": {"type": "long"},
-                "TotalCommitCount": {"type": "long"}
+                "TotalCommitCount": {"type": "long"},
+                "CommitSpanHours": {"type": "double"}
             }
         }
     }
